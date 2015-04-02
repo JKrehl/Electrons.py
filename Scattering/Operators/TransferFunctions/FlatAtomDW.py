@@ -3,7 +3,7 @@ from __future__ import division, print_function
 
 import numpy
 import numexpr
-from ...Utils import FourierTransforms as FT
+from ....Utilities import FourierTransforms as FT
 from ...Potentials.AtomPotentials import Kirkland
 
 from ..Base import PlaneOperator
