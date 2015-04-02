@@ -2,7 +2,7 @@
 from __future__ import division, print_function, absolute_import
 
 import numpy
-from ...Utils import FourierTransforms as FT
+from ...Utilities import FourierTransforms as FT
 from .Base import AtomPotentialGenerator
 
 import os.path

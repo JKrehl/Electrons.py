@@ -2,8 +2,8 @@ from __future__ import absolute_import, division
 
 import numpy
 
-from ...Utils.Physics import bohrr, echarge
-from ...Utils import FourierTransforms as FT, Physics
+from ....Utilities.Physics import bohrr, echarge, interaction_const
+from ....Utilities import FourierTransforms as FT
 
 class AtomPotentialGenerator:
 	def __init__(self):
@@ -22,7 +22,7 @@ class AtomPotentialGenerator:
 		return self.potential_from_ff(self.form_factors(Z, *k), *x)
 
 	def phaseshift(self, Z, energy,  *x):
-		return numpy.exp(1j*Physics.interaction_const(energy)*self.potential(Z, *x))
+		return numpy.exp(1j*interaction_const(energy)*self.potential(Z, *x))
 
 	def phaseshift_f(self, Z, energy, *x):
 		return FT.fft(self.phaseshift(Z, energy, *x))
