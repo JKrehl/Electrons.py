@@ -33,11 +33,9 @@ class RayKernel(Kernel):
 			h = 1/numpy.cos(al)
 			
 			e = numexpr.evaluate("x*cos(t)-y*sin(t)", local_dict=dict(x=x[None,:], y=y[:,None], t=ti)).flatten()
-			e = (e[None,:]-d[:,None])
-			sel = numexpr.evaluate("abs(e)<1.5",local_dict=dict(e=e))
-			sel = idx[:,sel]
+			sel = idx[:,numexpr.evaluate("abs(e-d)<1.5",local_dict=dict(e=e[None,:], d=d[:,None]))]
 			
-			e = e[list(sel)]
+			e = e[sel[1,:]] - d[sel[0,:]]
 			
 			calcs = 'where({0}<-b, 0, where({0}<-a, .5*e*({0}+b)**2, where({0}<a, .5*e*(a-b)**2+h*({0}+a), where({0}<b, 1-.5*e*(b-{0})**2, 1))))'
 			ker = numexpr.evaluate(calcs.format('(dif+.5)')+'-'+calcs.format('(dif-.5)'), local_dict=dict(dif=e, a=a, b=b, e=e, h=h))

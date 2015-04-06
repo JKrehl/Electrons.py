@@ -1,7 +1,4 @@
-# distutils: include_dirs = /usr/lib64/python2.7/site-packages/numpy/core/include
-# distutils: extra-compile-args='-fopenmp'
-# distutils: extra-link-args='-fopenmp'
-#cython: boundscheck=True, initializedcheck=False, wraparound=False
+#cython: boundscheck=False, initializedcheck=False, wraparound=False
 
 import numpy
 cimport numpy, cython

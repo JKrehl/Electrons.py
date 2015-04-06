@@ -1,6 +1,7 @@
 from __future__ import division, print_function, absolute_import
 
 import numpy
+import numexpr
 from ....Utilities import FourierTransforms as FT
 from .Base import AtomPotentialGenerator
 
@@ -14,7 +15,8 @@ class KirklandClass(AtomPotentialGenerator):
 
 	def form_factors(self, Z, *k):
 		qq = reduce(numpy.add.outer,tuple(numpy.require(i)**2 for i in k), 0)[(numpy.s_[:],)*len(k)+(None,)]
-		a,b,c,d = self.coeff[Z]
-		return numpy.sum(a/(qq+b)+c*numpy.exp(-d*qq),axis=-1)
+		
+		return numexpr.evaluate('a0/(qq+b0)+a1/(qq+b1)+a2/(qq+b2) + c0*exp(-d0*qq)+c1*exp(-d1*qq)+c2*exp(-d2*qq)',
+								local_dict=dict([('qq',qq)]+[("{}{}".format(a,j),self.coeff[Z][i,j]) for i,a in enumerate("abcd") for j in range(3)]))
 
 Kirkland = KirklandClass()

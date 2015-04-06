@@ -2,6 +2,7 @@
 from __future__ import division, print_function, absolute_import
 
 import numpy
+import numexpr
 from ....Utilities import FourierTransforms as FT
 from .Base import AtomPotentialGenerator
 
@@ -16,14 +17,15 @@ class WeickenmeierKohlClass(AtomPotentialGenerator):
 
 	def form_factors(self, Z, *k):
 		ss = reduce(numpy.add.outer,tuple((numpy.require(i)/_kds)**2 for i in k), 0)
-		A1 = 2.395e-2*Z/(3.+3.*self.coeff[Z][0])
-		A4 = self.coeff[Z][0]*A1
-		params = zip((A1,A1,A1,A4,A4,A4), self.coeff[Z][1:7])
+		A0 = 2.395e-2*Z/(3.+3.*self.coeff[Z][0])
+		A3 = self.coeff[Z][0]*A0
+		B = self.coeff[Z][1:7]
 	
 		mss = ss!=0
-		re = numpy.empty(ss.shape,type(A1))
-		re[mss] = 1.e-10*sum((A*(1-numpy.exp(-B*ss[mss]))/ss[mss] for (A,B) in params))
-		re[~mss] = 1.e-10*sum((A*B for (A,B) in params))
+		re = numpy.empty(ss.shape,type(A0))
+		re[mss] = numexpr.evaluate("1e-10*(A0*(1-exp(-B0*ss))/ss+A0*(1-exp(-B1*ss))/ss+A0*(1-exp(-B2*ss))/ss+A3*(1-exp(-B3*ss))/ss+A3*(1-exp(-B4*ss))/ss+A3*(1-exp(-B5*ss))/ss)",
+								   local_dict=dict(ss=ss[mss], A0=A0,A3=A3,B0=B[0],B1=B[1],B2=B[2],B3=B[3],B4=B[4],B5=B[5]))
+		re[~mss] = 1e-10*(A0*B[0]+A0*B[1]+A0*B[2]+A3*B[3]+A3*B[4]+A3*B[5])
 
 		return re
 	

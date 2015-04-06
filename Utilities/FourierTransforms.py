@@ -38,6 +38,7 @@ def ifft(ar, *args, **kwargs):
 	return pyfftw.builders.ifftn(ar, *args, **kwargs)()
 
 def mfft(ar, *args, **kwargs):
+	axes = None
 	if kwargs.has_key('axis'):
 		axes = (kwargs.pop('axis'),)
 		kwargs['axes'] = axes
@@ -47,6 +48,7 @@ def mfft(ar, *args, **kwargs):
 	return numpy.fft.fftshift(pyfftw.builders.fftn(numpy.fft.ifftshift(ar,axes=axes), *args, **kwargs)(),axes=axes)
 
 def mifft(ar, *args, **kwargs):
+	axes = None
 	if kwargs.has_key('axis'):
 		axes = (kwargs.pop('axis'),)
 		kwargs['axes'] = axes
