@@ -19,6 +19,7 @@ class RayKernel(Kernel):
 		res = [[],[],[]]
 
 		dd = abs(self.d[1]-self.d[0])
+		unit_area = dd**2
 
 		x = self.x/dd
 		y = self.y/dd
@@ -38,7 +39,7 @@ class RayKernel(Kernel):
 			e = e[sel[1,:]] - d[sel[0,:]]
 			
 			calcs = 'where({0}<-b, 0, where({0}<-a, .5*e*({0}+b)**2, where({0}<a, .5*e*(a-b)**2+h*({0}+a), where({0}<b, 1-.5*e*(b-{0})**2, 1))))'
-			ker = numexpr.evaluate(calcs.format('(dif+.5)')+'-'+calcs.format('(dif-.5)'), local_dict=dict(dif=e, a=a, b=b, e=e, h=h))
+			ker = numexpr.evaluate(calcs.format('area*'+'(dif+.5)')+'-'+calcs.format('(dif-.5)'), local_dict=dict(dif=e, a=a, b=b, e=e, h=h, area=unit_area))
 			
 			csel = ker>=1e-2
 			sel = sel[:,csel]
