@@ -39,14 +39,14 @@ class FlatProjector(scipy.sparse.linalg.LinearOperator):
 			self.nnz = self.dat.size
 			self.dtype = self.dat.dtype
 		else:
-			raise NotImplemented
+			raise NotImplementedError
 
 	def matvec(self, v):
 		v = v.reshape(self.shape[1])
 		
 		u = numpy.zeros(self.shape[0], self.dtype)
 
-		cy.matvec(self.dat, self.idx[0], self.idx[1], v, u, self.dat.size)
+		cy.matvec(v, u, self.dat, self.idx[0], self.idx[1])
 
 		return u
 	
@@ -55,6 +55,6 @@ class FlatProjector(scipy.sparse.linalg.LinearOperator):
 		
 		u = numpy.zeros(self.shape[1], self.dtype)
 
-		cy.rmatvec(self.dat, self.idx[0], self.idx[1], v, u, self.dat.size)
+		cy.matvec(v, u, self.dat, self.idx[1], self.idx[0])
 
 		return u

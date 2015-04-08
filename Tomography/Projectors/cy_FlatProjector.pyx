@@ -15,29 +15,14 @@ ctypedef fused dat_t:
 	numpy.float_t
 
 def matvec(
-		dat_t[:] dat,
-		idx_t[:] row,
-		idx_t[:] col,
 		dat_t[:] vec,
 		dat_t[:] res,
-		idx_t tensor_length,
-		):
-
-	cdef idx_t i
-
-	with nogil:
-		for i in range(tensor_length):
-			res[col[i]] += dat[i]*vec[row[i]]
-
-def rmatvec(
 		dat_t[:] dat,
-		idx_t[:] row,
 		idx_t[:] col,
-		dat_t[:] vec,
-		dat_t[:] res,
-		idx_t tensor_length,
+		idx_t[:] row,
 		):
 
+	cdef idx_t tensor_length = dat.size
 	cdef idx_t i
 
 	with nogil:

@@ -6,23 +6,32 @@ import numexpr
 from .Base import Kernel
 
 class RayKernel(Kernel):
-	def __init__(self, y, x, t, d, dtype=None, lazy=False):
+	def __init__(self, y, x, t, d, mask=None, dtype=None, lazy=False):
+		y,x,t,d = (numpy.require(i) for i in (y,x,t,d))
 		self.__dict__.update(dict(y=y, x=x, t=t, d=d, dtype=dtype))
 		self.ndims = 2
 		self.shape = t.shape+d.shape+y.shape+x.shape
 		self.fshape = (t.size*d.size, y.size*x.size)
 
+		if mask:
+			self.mask = numpy.add.outer((numpy.arange(y.size)-y.size//2)**2,(numpy.arange(x.size)-x.size//2)**2).flatten()<(.25*min(y.size**2, x.size**2))
+		else:
+			self.mask = None
+		
 		if not lazy:
 			self.calc()
 		
 	def calc(self):
 		res = [[],[],[]]
 
+		xd = abs(self.x[1]-self.x[0])
+		yd = abs(self.y[1]-self.y[0])
 		dd = abs(self.d[1]-self.d[0])
-		unit_area = dd**2
+		
+		unit_area = xd*yd/dd
 
-		x = self.x/dd
-		y = self.y/dd
+		x = self.x/xd
+		y = self.y/yd
 		d = self.d/dd
 		
 		idx = numpy.indices((self.d.size, self.y.size*self.x.size))
@@ -33,15 +42,22 @@ class RayKernel(Kernel):
 			b = .5*(numpy.cos(al)+numpy.sin(al))
 			h = 1/numpy.cos(al)
 			
-			e = numexpr.evaluate("x*cos(t)-y*sin(t)", local_dict=dict(x=x[None,:], y=y[:,None], t=ti)).flatten()
-			sel = idx[:,numexpr.evaluate("abs(e-d)<1.5",local_dict=dict(e=e[None,:], d=d[:,None]))]
+			if b==a: f = 0
+			else: f = h/(b-a)
 			
-			e = e[sel[1,:]] - d[sel[0,:]]
+			e = numexpr.evaluate("x*cos(t)-y*sin(t) -d", local_dict=dict(x=x[None,None,:], y=y[None,:,None], d=d[:,None,None], t=ti)).reshape(d.size, y.size*x.size)
+			if self.mask is not None:
+				sel = numexpr.evaluate("mask&(abs(e)<(b+.5))", local_dict=dict(mask = self.mask[None,:], e=e, b=b))
+			else:
+				sel = numexpr.evaluate("(abs(e)<(b+.5)", local_dict=dict(e=e, b=b))
+
+			e = e[sel]
+			sel = idx[:,sel]
 			
-			calcs = 'where({0}<-b, 0, where({0}<-a, .5*e*({0}+b)**2, where({0}<a, .5*e*(a-b)**2+h*({0}+a), where({0}<b, 1-.5*e*(b-{0})**2, 1))))'
-			ker = numexpr.evaluate(calcs.format('area*'+'(dif+.5)')+'-'+calcs.format('(dif-.5)'), local_dict=dict(dif=e, a=a, b=b, e=e, h=h, area=unit_area))
+			calcs = 'where({0}<-b, 0, where({0}<-a, .5*f*({0}+b)**2, where({0}<a, .5*f*(a-b)**2+h*({0}+a), where({0}<b, 1-.5*f*(b-{0})**2, 1))))'
+			ker = numexpr.evaluate('area*('+calcs.format('(dif+.5)')+'-'+calcs.format('(dif-.5)')+')', local_dict=dict(dif=e, a=a, b=b, f=f, h=h, area=unit_area))
 			
-			csel = ker>=1e-2
+			csel = ker>=0#1e-2
 			sel = sel[:,csel]
 			
 			res[0].append(ker[csel])
