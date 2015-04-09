@@ -2,14 +2,7 @@ from __future__ import division, generators
 
 import numpy, re
 
-def lazy_property(fn):
-	decorated_name = '__'+fn.__name__
-	@property
-	def __lazy_property(self):
-		if not hasattr(self, decorated_name):
-			setattr(self, decorated_name, fn(self))
-		return getattr(self, decorated_name)
-	return __lazy_property
+from .Magic import lazy_property
 
 def normalise_quart(quart):
 	quart = numpy.require(quart)
@@ -134,6 +127,19 @@ class Trafo3D(Trafo):
 	__name__ = 'Trafo3D'
 	
 	def __init__(self, **kwargs):
+		"""possible arguments:
+		affine = 3x3-array
+		quar = 4-vector
+		axisrad = 4-vector
+		axisdeg = 4-vector
+		rotmat = 3x3-array
+		scale = scalar or 3-vector
+		shift = scalar or 3-vector
+		transpose = 3-vector
+		inv = bool
+		mat_inv = bool
+		shift_inv = bool
+		"""
 
 		if kwargs.has_key('mat'): 
 			self.mat = kwargs['mat']

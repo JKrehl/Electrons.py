@@ -14,7 +14,7 @@ class WeickenmeierKohlFSCATTClass(AtomPotentialGenerator):
 	def __init__(self):
 		self.coeff = {int(i[0]):i[1:] for i in numpy.loadtxt(__dir__+"/parameters/weickenmeier_kohl_fscatt_coefficients.dat")}
 
-	def form_factors(self, Z, *k):
+	def form_factors_k(self, Z, *k):
 		ss = reduce(numpy.add.outer,tuple((numpy.require(i)/_kds)**2 for i in k), 0)
 		mss = ss!=0
 		
