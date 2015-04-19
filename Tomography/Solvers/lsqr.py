@@ -93,7 +93,7 @@ def _sym_ortho(a, b):
 
 
 def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
-		iter_lim=None, show=False, calc_var=False, showfun = None, interm_results=False):
+		 iter_lim=None, show=False, calc_var=False, showfun = None, interm_results=False, mask=None):
 	"""Find the least-squares solution to a large, sparse, linear system
 	of equations.
 
@@ -246,8 +246,22 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		systems using LSQR and CRAIG", BIT 35, 588-604.
 
 	"""
+	if mask is not None:
+		__mask = mask
+		def mask(b):
+			return b.reshape(__mask.shape)[__mask]
+		def unmask(b):
+			rb = np.zeros(__mask.shape, b.dtype)
+			rb[__mask] = b
+			return rb
+	else:
+		def mask(b):
+			return b
+		def unmask(b):
+			return b
+	
 	A = aslinearoperator(A)
-	b = b.squeeze()
+	b = mask(b.squeeze())
 
 	m, n = A.shape
 	if iter_lim is None: iter_lim = 2 * n
@@ -307,7 +321,7 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 
 	if beta > 0:
 		u = (1/beta) * u
-		v = A.rmatvec(u)
+		v = A.rmatvec(unmask(u))
 		alfa = np.linalg.norm(v)
 
 	if alfa > 0:
@@ -350,7 +364,7 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		%                alfa*v  =  A'*u  -  beta*v.
 		"""
 		tm = -time.time()
-		u = A.matvec(v) - alfa * u
+		u = mask(A.matvec(v)) - alfa * u
 		tm += time.time()
 		beta = np.linalg.norm(u)
 
@@ -358,7 +372,7 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 			u = (1/beta) * u
 			anorm = sqrt(anorm**2 + alfa**2 + beta**2 + damp**2)
 			trm = -time.time()
-			v = A.rmatvec(u) - beta * v
+			v = A.rmatvec(unmask(u)) - beta * v
 			trm += time.time()
 			alfa  = np.linalg.norm(v)
 			if alfa > 0:
