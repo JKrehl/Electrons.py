@@ -4,7 +4,7 @@ from . import FourierTransforms
 from . import CoordinateTrafos
 #from . import VolumeTrafos
 from . import Physics
-from . import DM3Reader
+#from . import DM3Reader
 from .SlicePlayer import SlicePlayer
 
 __all__ = [s for s in dir() if not s.startswith('_')]
