@@ -3,3 +3,9 @@
 *.c
 *.html
 *.pyxbldc
+*.aux
+*.log
+*.out
+*.bib
+*.run.xml
+*.el

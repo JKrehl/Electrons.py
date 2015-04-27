@@ -1,0 +1,45 @@
+\documentclass{scrartcl}
+
+\usepackage{amsmath}
+
+\title{Parametrizations for Scattering Potentials in high-energe TEM}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\def\vk{{\bf k}}
+
+It should be noted that every quantity is in SI-units, regardless of what the originators of the parametrizations used. Also the spatial frequency is in the proper unit \(k = \frac{2 \pi}{\lambda}\).
+
+\section{Weickenmeier-Kohl}
+
+This parametrization is from the paper: Weickenmeier and Kohl, ``Computation of absorptive form factors for high-energy electron diffraction'' in Acta Cristallographica 1991.
+
+The atoms are paremtrized by 7 factors, which we will call \(A_0\) and \(B_1, ..., B_6\) and can be found in the corresponding parameters file ``../parameters/weickenmeier\_kohl\_coefficients.dat''.
+
+\begin{align}
+  A_1 = A_2 = A_3 &= \frac{16 \pi^2 \cdot 2.395e8 \cdot Z}{3(1+A_0)}\\
+  A_4 = A_5 = A_6 &= A_0 A_1\\
+  F(\vk \neq 0) &= \sum\limits_{i=1}^{6} A_i \frac{\left(1-e^{-B_i \vk^2}\right)}{k^2}\\
+  F(\vk = 0) &= \sum\limits_{i=1}^{6} A_i B_i
+\end{align}
+
+\section{Weickenmeier-Kohl as seen in FSCATT}
+
+\section{Kirkland}
+
+This parametrization is from the book: Earl Kirkland, ``Advanced Computing in Electromn Microscopy'', 1998.
+
+
+The atoms are paremtrized by 16 factors, which we will call \(A_1, ..., A_4\), \(B_1, ..., B_4\), \(C_1, ..., C_4\) and \(D_1, ..., D_4\) and can be found in the corresponding parameters file ``../parameters/kirkland\_coefficients.dat''.
+
+\begin{align}
+  F(\vk) &= \sum\limits_{i=1}^{4} \frac{A_i}{\frac{\vk^2}{4 \pi^2}+B_i} + \sum\limits_{i=1}^{4} C_i e^{-D_i \frac{\vk^2}{4 \pi^2}} \\
+\end{align}
+
+\section{Peng-Dudarev}
+
+
+\end{document}
