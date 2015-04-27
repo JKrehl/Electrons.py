@@ -35,13 +35,17 @@ class WeickenmeierKohlClass(AtomPotentialGenerator):
 		A4 = self.coeff[Z][0]*A1
 		B = self.coeff[Z][1:7]
 
-		return numexpr.evaluate('1/(pi**3*8)*2*pi**2/r*(A1*(ErfcB1+ErfcB2+ErfcB3)+A4*(ErfcB4+ErfcB5+ErfcB6))',
-								local_dict=dict(r=r, pi=numpy.pi,A1=A1,A4=A4,
-												ErfcB1=special.erfc(.5*r/numpy.sqrt(B[0])),
-												ErfcB2=special.erfc(.5*r/numpy.sqrt(B[1])),
-												ErfcB3=special.erfc(.5*r/numpy.sqrt(B[2])),
-												ErfcB4=special.erfc(.5*r/numpy.sqrt(B[3])),
-												ErfcB5=special.erfc(.5*r/numpy.sqrt(B[4])),
-												ErfcB6=special.erfc(.5*r/numpy.sqrt(B[5]))))
+		res = numexpr.evaluate('1/(pi**3*8)*2*pi**2/r*(A1*(ErfcB1+ErfcB2+ErfcB3)+A4*(ErfcB4+ErfcB5+ErfcB6))',
+							   local_dict=dict(r=r, pi=numpy.pi,A1=A1,A4=A4,
+											   ErfcB1=special.erfc(.5*r/numpy.sqrt(B[0])),
+											   ErfcB2=special.erfc(.5*r/numpy.sqrt(B[1])),
+											   ErfcB3=special.erfc(.5*r/numpy.sqrt(B[2])),
+											   ErfcB4=special.erfc(.5*r/numpy.sqrt(B[3])),
+											   ErfcB5=special.erfc(.5*r/numpy.sqrt(B[4])),
+											   ErfcB6=special.erfc(.5*r/numpy.sqrt(B[5]))))
+		res[r==0] = 1/(numpy.pi**3*8)*2*numpy.pi**2*(A1*3+A4*3)/2
+
+		return res
+		
 		
 WeickenmeierKohl = WeickenmeierKohlClass()
