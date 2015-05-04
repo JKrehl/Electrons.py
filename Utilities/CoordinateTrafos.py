@@ -99,7 +99,7 @@ class Trafo:
 		if numpy.isscalar(b):
 			return (b*self.affine[:,dimension])
 		elif isinstance(b, numpy.ndarray):
-			return (b[...,None]*self.affine[...,:,dimension])
+			return numpy.multiply.outer(self.affine[:,dimension],b)
 		
 	def apply_to_bases(self, *bases):
 		assert len(bases) == self.n, 'Dimensional Mismatch: {}\t{}'.format(len(bases), self.n)
@@ -262,4 +262,4 @@ class Trafo2D(Trafo):
 	def add_postshift(self, value):
 		mt = numpy.eye(3, dtype=self.mat.dtype)
 		mt[:2,2] = value
-		self.mat = numpy.dot(mt, self.mat)		
+		self.mat = numpy.dot(mt, self.mat)
