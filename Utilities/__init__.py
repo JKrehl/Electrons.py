@@ -6,6 +6,6 @@ from . import CoordinateTrafos
 from . import Physics
 #from . import DM3Reader
 from .SlicePlayer import SlicePlayer
-from . import progressbar
+from .Progress import Progress
 
 __all__ = [s for s in dir() if not s.startswith('_')]
