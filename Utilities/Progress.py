@@ -10,8 +10,9 @@ except ImportError:
 import collections
 
 class Progress(collections.Iterator):
-	def __init__(self, iterable, length=None):
+	def __init__(self, iterable, length=None, keep=False):
 		self.iter = iterable.__iter__()
+		self.keep = keep
 		
 		if ipython:
 			if length is None:
@@ -32,4 +33,9 @@ class Progress(collections.Iterator):
 		if ipython:
 			self.bar.value += 1
 			self.text.value = self.textfmt.format(self.bar.value)
-			return self.iter.next()
+			try:
+				return self.iter.next()
+			except StopIteration:
+				if not self.keep:
+					self.box.close()
+				raise StopIteration
