@@ -7,7 +7,7 @@ pyximport.install()
 
 from ..Kernels import Kernel
 from .FlatProjector import FlatProjector
-from . import cy_StackedProjector as cy
+from . import StackedProjector_cy as cy
 
 class StackedProjector(scipy.sparse.linalg.LinearOperator):
 	def __init__(self, kernel, z, shape=None, threads=0):
@@ -15,7 +15,10 @@ class StackedProjector(scipy.sparse.linalg.LinearOperator):
 
 		self.flat_proj = FlatProjector(kernel)
 
-		self.shape = tuple(self.z.size*i for i in self.flat_proj.shape)
+		if shape is not None:
+			self.shape = shape
+		else:
+			self.shape = tuple(self.z.size*i for i in self.flat_proj.shape)
 		
 		self.dtype = self.flat_proj.dtype
 		self.dat = self.flat_proj.dat

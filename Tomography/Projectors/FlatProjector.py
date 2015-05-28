@@ -6,7 +6,7 @@ import pyximport
 pyximport.install()
 
 from ..Kernels import Kernel
-from . import cy_FlatProjector as cy
+from . import FlatProjector_cy as cy
 
 class FlatProjector(scipy.sparse.linalg.LinearOperator):
 	def __init__(self, kernel, shape = None):
