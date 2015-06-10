@@ -69,4 +69,4 @@ class AtomicObject:
 		return numpy.amax(self.atoms['xyz'][:,2])
 
 	def copy(self):
-		return self.__class__(atoms=atoms.copy())
+		return self.__class__(atoms=self.atoms.copy())

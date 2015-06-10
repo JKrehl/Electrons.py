@@ -9,10 +9,10 @@ from ...Potentials.AtomPotentials import Kirkland
 from ..Base import PlaneOperator
 
 class FlatAtomDW(PlaneOperator):
-	def __init__(self, x, y, atoms, phaseshifts_f=None, kx=None, ky=None, kk=None, z=None, atom_potential_gen=Kirkland, energy=None, lazy=False):
+	def __init__(self, x, y, atoms, phaseshifts_f=None, kx=None, ky=None, kk=None, z=None, atom_potential_gen=Kirkland, energy=None, lazy=False, forgetful=False):
 		self.__dict__.update(dict(x=x, y=y, atoms=atoms, z=z,
 								  phaseshifts_f=phaseshifts_f, atom_potential_gen=atom_potential_gen, energy=energy,
-								  kx=kx, ky=ky, kk=kk, lazy=lazy))
+								  kx=kx, ky=ky, kk=kk, lazy=lazy, forgetful=forgetful))
 
 		self.transfer_function = None
 		if not self.lazy:
@@ -35,8 +35,8 @@ class FlatAtomDW(PlaneOperator):
 		cis = lambda p:(numpy.cos(p)+1j*numpy.sin(p))
 
 		for a in self.atoms:
-			tf += numexpr.evaluate('ps*exp(1j*2*pi*(xs*kx+ys*ky)-kk*B/8)',
-										local_dict={'ps':self.phaseshifts_f[a['Z']],'pi':numpy.pi,
+			tf += numexpr.evaluate('ps*exp(1j*(xs*kx+ys*ky)-kk*B/8)',
+										local_dict={'ps':self.phaseshifts_f[a['Z']],
 													'xs':a['xyz'][0],'ys':a['xyz'][1],
 													'kx':self.kx[:,None], 'ky':self.ky[None,:],
 													'kk':self.kk, 'B':a['B']})
@@ -45,4 +45,7 @@ class FlatAtomDW(PlaneOperator):
 	def apply(self, wave):
 		if self.transfer_function is None:
 			self.generate_tf()
-		return self.transfer_function*wave
+		res = self.transfer_function*wave
+		if self.forgetful:
+			self.transfer_function = None
+		return res

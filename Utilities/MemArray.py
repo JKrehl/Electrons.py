@@ -22,8 +22,16 @@ class memarray(numpy.memmap):
 		if array is not None:
 			self[...] = array[...]
 
-def memconcatenate(arrs):
-	dtype = arrs[0].dtype
+def memconcatenate(arrs, dtype=None):
+	if dtype is None:
+		if len(arrs)>0:
+			dtype = arrs[0].dtype
+		else:
+			dtype = numpy.float
+			
+	if len(arrs)==0:
+		return numpy.array([], dtype=dtype)
+	
 	shape = (sum((i.size for i in arrs)),)
 	re = memarray(shape=shape, dtype=dtype)
 	i = 0

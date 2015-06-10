@@ -20,4 +20,3 @@ class Kernel:
 
 	def calc(self):
 		raise NotImplemented
-

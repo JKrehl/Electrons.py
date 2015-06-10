@@ -3,16 +3,15 @@ from __future__ import absolute_import, division
 import numpy
 from ..Operators import OperatorChain
 from ..Operators.TransferFunctions import FlatAtomDW
-from ..Operators.Propagators import FresnelFourier
 from ..Potentials.AtomPotentials import Kirkland
 from ...Utilities import FourierTransforms as FT, Progress
 
-class Multislice:
-	def __init__(self, x, y, potential, energy, zi=None, zf=None, trafo=None, forgetful=False, atom_potential_generator=Kirkland, transfer_function=FlatAtomDW, propagator=FresnelFourier):
+class Projection:
+	def __init__(self, x, y, potential, energy, zi=None, zf=None, trafo=None, forgetful=False, atom_potential_generator=Kirkland, transfer_function=FlatAtomDW):
 		self.__dict__.update(dict(x=x, y=y, energy=energy,
 								  zi=zi, zf=zf, trafo=trafo,
 								  forgetful = forgetful,
-								  atom_potential_generator=atom_potential_generator, transfer_function=transfer_function, propagator=propagator))
+								  atom_potential_generator=atom_potential_generator, transfer_function=transfer_function))
 		self.prepared = False
 		
 		if self.trafo is not None:
@@ -35,10 +34,7 @@ class Multislice:
 		kk =  numpy.add.outer(kx**2, ky**2)
 		
 		for i in xrange(self.potential.atoms.size):
-			self.opchain.append(self.transfer_function(self.x, self.y, self.potential.atoms[i:i+1], kx=kx, ky=ky, kk=kk, phaseshifts_f=phaseshifts_f, lazy=True, forgetful=self.forgetful)) 
-
-		for zi, zf in self.opchain.get_gaps():
-			self.opchain.append(self.propagator(zi,zf, self.energy, kx, ky, kk))
+			self.opchain.append(self.transfer_function(self.x, self.y, self.potential.atoms[i:i+1], kx=kx, ky=ky, kk=kk, phaseshifts_f=phaseshifts_f, lazy=True, forgetful=self.forgetful))
 
 		self.opchain.impose_zorder()
 		
