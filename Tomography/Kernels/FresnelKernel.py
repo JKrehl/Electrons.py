@@ -136,3 +136,5 @@ class FresnelKernel(Kernel):
 		self.idx = (self.idx_te, self.idx_yx)
 		
 		return [self.dat, self.idz, self.bounds, self.idx_te, self.idx_yx]
+
+	def save(self)
