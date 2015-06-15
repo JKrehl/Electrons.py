@@ -139,6 +139,7 @@ class Trafo3D(Trafo):
 		inv = bool
 		mat_inv = bool
 		shift_inv = bool
+		perm = 3-vector
 		"""
 
 		if kwargs.has_key('mat'): 
@@ -154,7 +155,7 @@ class Trafo3D(Trafo):
 			
 			for name, value in sorted_kwargs:
 				if name.startswith('affine'):
-					self.mat = numpy.dot(affine_to_4mat(value), self.mat)
+					self.mat = numpy.dot(affine_to_4mat(numpy.require(value)), self.mat)
 				elif name.startswith('quar'):
 					self.mat = numpy.dot(affine_to_4mat(quart_to_rotmat(normalise_quart(value))), self.mat)
 				elif name.startswith('axisrad'):
@@ -170,11 +171,13 @@ class Trafo3D(Trafo):
 				elif name.startswith('shift'): 
 					self.add_postshift(value)
 				elif name.startswith('inv'):
-					if val: self.mat = numpy.linalg.inv(self.mat)
+					if value: self.mat = numpy.linalg.inv(self.mat)
 				elif name.startswith('mat_inv'):
-					if val: self.mat[:3,:3] = numpy.linalg.inv(self.mat[:3,:3])
+					if value: self.mat[:3,:3] = numpy.linalg.inv(self.mat[:3,:3])
 				elif name.startswith('shift_inv'):
-					if val: self.mat[:3,3] = -self.mat[:3,3]
+					if value: self.mat[:3,3] = -self.mat[:3,3]
+				elif name.startswith('perm'):
+					self.mat = self.mat[:,list(value)+[3,]][list(value)+[3,],:]
 				else:
 					raise TypeError('Invalid keyword')
 

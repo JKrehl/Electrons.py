@@ -93,7 +93,7 @@ def _sym_ortho(a, b):
 
 
 def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
-		 iter_lim=None, show=False, calc_var=False, showfun = None, interm_results=False, mask=None):
+		 iter_lim=None, show=False, calc_var=False, showfun = None, interm_results=False, interm_results_sink=None, mask=None):
 	"""Find the least-squares solution to a large, sparse, linear system
 	of equations.
 
@@ -317,7 +317,7 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 	beta = np.linalg.norm(u)
 	w = np.zeros(n)
 
-	if interm_results: ires = []
+	if interm_results and interm_results_sink is None: ires = []
 
 	if beta > 0:
 		u = (1/beta) * u
@@ -407,8 +407,12 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		w = v + t2 * w
 		ddnorm = ddnorm + np.linalg.norm(dk)**2
 
-		if interm_results and itn%interm_results==0: ires.append(x.copy())
-
+		if interm_results and itn%interm_results==0:
+			if interm_results_sink is None:
+				ires.append(x.copy())
+			else:
+				interm_results_sink(itn, x)
+				
 		if calc_var:
 			var = var + dk**2
 
@@ -508,7 +512,7 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		print(str3+ '   ' + str4)
 		print(' ')
 
-	if interm_results:
+	if interm_results and interm_results_sink is None:
 		return x, ires, istop, itn, r1norm, r2norm, anorm, acond, arnorm, xnorm, var
 	else:
 		return x, istop, itn, r1norm, r2norm, anorm, acond, arnorm, xnorm, var

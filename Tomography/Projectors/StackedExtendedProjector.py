@@ -19,8 +19,8 @@ class StackedExtendedProjector(scipy.sparse.linalg.LinearOperator):
 		else:
 			self.shape = tuple(i//self.kernel.idz.size*self.z.size for i in self.kernel.fshape)
 
-		self.dtype = self.kernel.dat.dtype
-		self.itype = self.kernel.idx[0].dtype
+		self.dtype = self.kernel.dtype
+		self.itype = self.kernel.itype
 
 		self.dat = self.kernel.dat
 		self.idx = self.kernel.idx
@@ -35,5 +35,14 @@ class StackedExtendedProjector(scipy.sparse.linalg.LinearOperator):
 		u = numpy.zeros(self.shape[0], self.dtype)
 
 		cy.matvec(v,u, self.dat, self.idz, self.bounds, self.idx[1], self.idx[0], self.z.size, self.threads)
+
+		return u
+	
+	def rmatvec(self, v):
+		v = v.reshape(self.shape[0])
+		
+		u = numpy.zeros(self.shape[1], self.dtype)
+
+		cy.matvec(v,u, self.dat, self.idz, self.bounds, self.idx[0], self.idx[1], self.z.size, self.threads)
 
 		return u
