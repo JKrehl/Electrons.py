@@ -6,10 +6,16 @@ import numexpr
 from .Base import Kernel
 
 class RayKernel(Kernel):
-	def __init__(self, y, x, t, d, mask=None, dtype=None, lazy=False):
+	ndims = 2
+	dtype=numpy.float64
+	itype=numpy.int32
+	__arrays__ = ['dat','idx_te','idx_yx','z','y','x','t','e','mask']
+	
+	def __init__(self, y, x, t, d, mask=None, lazy=False):
+		self.__arrays__ = ['dat','idx_te','idx_yx','z','y','x','t','e','mask']
+		
 		y,x,t,d = (numpy.require(i) for i in (y,x,t,d))
 		self.__dict__.update(dict(y=y, x=x, t=t, d=d, dtype=dtype))
-		self.ndims = 2
 		self.shape = t.shape+d.shape+y.shape+x.shape
 		self.fshape = (t.size*d.size, y.size*x.size)
 
@@ -20,7 +26,12 @@ class RayKernel(Kernel):
 		
 		if not lazy:
 			self.calc()
-		
+
+
+	@property
+	def idx(self):
+		return (self.idx_te, self.idx_yx)
+	
 	def calc(self):
 		res = [[],[],[]]
 
@@ -34,7 +45,7 @@ class RayKernel(Kernel):
 		y = self.y/yd
 		d = self.d/dd
 		
-		idx = numpy.indices((self.d.size, self.y.size*self.x.size))
+		idx = numpy.indices((self.d.size, self.y.size*self.x.size)).astype(self.itype)
 		
 		for it,ti in enumerate(self.t):
 			al = abs((ti+numpy.pi/4)%(numpy.pi/2) - numpy.pi/4)
@@ -67,8 +78,9 @@ class RayKernel(Kernel):
 			assert res[0][-1].size == res[1][-1].size
 
 		self.dat = numpy.hstack(res[0])
-		self.idx = (numpy.hstack(res[2]), numpy.hstack(res[1]))
+		self.idx_te = numpy.hstack(res[2])
+		self.idx_yx = numpy.hstack(res[1])
 			
 		self.status = 0
 
-		return (self.dat, self.idx[0], self.idx[1])
+		return (self.dat, self.idx_te, self.idx_yx)

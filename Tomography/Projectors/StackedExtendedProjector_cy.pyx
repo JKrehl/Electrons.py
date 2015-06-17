@@ -3,7 +3,7 @@
 import numpy
 cimport numpy, cython
 from cython.parallel import parallel, prange
-from multiprocessing import cpu_count
+cimport openmp
 
 ctypedef fused idx_t:
 	numpy.int32_t
@@ -40,10 +40,10 @@ def matvec(
 	cdef idx_t* idx_row_view
 	
 	if threads==0:
-		threads = cpu_count()
+		threads = openmp.omp_get_max_threads()
 
 	with nogil, parallel(num_threads=threads):
-		for i in prange(zlen, schedule='dynamic'):
+		for i in prange(zlen, schedule='guided'):
 			res_view = &res[i*row_stride]
 			for j in range(idzlen):
 				if (i+idz[j])<zlen and (i+idz[j])>=0:
