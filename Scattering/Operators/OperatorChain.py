@@ -2,6 +2,8 @@ from __future__ import absolute_import, print_function, division
 
 import numpy
 
+from ...Utilities import Progress
+
 from .Base import IntervalOperator, PlaneOperator
 
 class OperatorChain(numpy.ndarray):
@@ -44,10 +46,14 @@ class OperatorChain(numpy.ndarray):
 		
 		self[-1] = (zi, zf, operator)
 
-	def apply(self, wave):
+	def apply(self, wave, progress=False):
 		self.impose_zorder()
-		
-		for op in self['operator']:
-			wave = op.apply(wave)
+
+		if progress:
+			for op in Progress(self['operator'], self.size):
+				wave = op.apply(wave)
+		else:
+			for op in self['operator']:
+				wave = op.apply(wave)
 
 		return wave
