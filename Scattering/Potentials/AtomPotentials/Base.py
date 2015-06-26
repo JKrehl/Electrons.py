@@ -40,7 +40,7 @@ class AtomPotentialGenerator:
 		return self.potential_k(Z, *x)
 	
 	def phaseshift(self, Z, energy,  *x):
-		return numpy.exp(1j*interaction_const(energy)*self.potential(Z, *x))
+		return interaction_const(energy)*self.potential(Z, *x)
 
 	def phaseshift_f(self, Z, energy, *x):
 		return FT.fft(self.phaseshift(Z, energy, *x))

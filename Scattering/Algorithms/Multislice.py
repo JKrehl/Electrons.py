@@ -39,8 +39,8 @@ class Multislice:
 		slice_thickness = Physics.wavenumber(self.energy)/(4*max(numpy.amax(numpy.abs(ky)), numpy.amax(numpy.abs(kx)))**2)
 		while i<self.potential.atoms.size:
 			j = i+1
-			zi = self.potential.atoms['xyz'][i,2]
-			while j<self.potential.atoms.size and self.potential.atoms['xyz'][j,2]<zi+slice_thickness:
+			zi = self.potential.atoms['zyx'][i,0]
+			while j<self.potential.atoms.size and self.potential.atoms['zyx'][j,0]<zi+slice_thickness:
 				j += 1
 						
 			self.opchain.append(self.transfer_function(self.x, self.y, self.potential.atoms[i:j], kx=kx, ky=ky, kk=kk, phaseshifts_f=phaseshifts_f, lazy=True, forgetful=self.forgetful))

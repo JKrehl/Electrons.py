@@ -15,7 +15,7 @@ class RayKernel(Kernel):
 		self.__arrays__ = ['dat','idx_te','idx_yx','z','y','x','t','e','mask']
 		
 		y,x,t,d = (numpy.require(i) for i in (y,x,t,d))
-		self.__dict__.update(dict(y=y, x=x, t=t, d=d, dtype=dtype))
+		self.__dict__.update(dict(y=y, x=x, t=t, d=d))
 		self.shape = t.shape+d.shape+y.shape+x.shape
 		self.fshape = (t.size*d.size, y.size*x.size)
 

@@ -133,9 +133,14 @@ class FresnelKernel2(Kernel):
 
 			for it, ti in Progress(enumerate(self.t), self.t.size):
 				w,v = wvs[it]
-				
-				sel = numexpr.evaluate('pi>=((v-e)**2-dv**2+z**2)*k/(2*abs(w))', local_dict=dict(z=zi, e=self.e[e_idx], w=w[yx_idx], v=v[yx_idx], pi=numpy.pi, k=self.k, dw=dyx, dv=dyx))
 
+				vmemax = numpy.sqrt(numpy.pi/self.k*2*max(wmx,-wmn)+dyx**2-zi**2)
+				
+				sel = numexpr.evaluate('vmemax>=abs(v-e)', local_dict=dict(v=v[yx_idx],  e=self.e[e_idx], vmemax=vmemax))
+				sel[sel] = numexpr.evaluate('pi>=((v-e)**2-dv**2+z**2)*k/(2*abs(w))', local_dict=dict(z=zi, e=self.e[e_idx[sel]], w=w[yx_idx[sel]], v=v[yx_idx[sel]], pi=numpy.pi, k=self.k, dw=dyx, dv=dyx))
+				
+				#sel2 = numexpr.evaluate('pi>=((v-e)**2-dv**2+z**2)*k/(2*abs(w))', local_dict=dict(z=zi, e=self.e[e_idx], w=w[yx_idx], v=v[yx_idx], pi=numpy.pi, k=self.k, dw=dyx, dv=dyx))
+				
 				if numpy.count_nonzero(sel)>0:
 
 					e_sel = e_idx[sel]
