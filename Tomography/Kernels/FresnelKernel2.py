@@ -4,6 +4,7 @@ import numpy
 import numexpr
 import scipy.special
 import scipy.interpolate
+import scipy.ndimage
 
 from Physics.Utilities import Physics
 from Physics.Utilities import CoordinateTrafos as CT
@@ -31,14 +32,18 @@ class FresnelKernel2(Kernel):
 		self.idz = self.estimate_idz_range()
 		self.dz = (self.z[1]-self.z[0])*self.idz
 
-		self.shape = self.idz.shape+self.t.shape+self.e.shape+self.idz.shape+self.y.shape+self.x.shape
-		self.fshape = (self.idz.size*self.t.size*self.e.size, self.idz.size*self.y.size*self.x.size)
-
 		if mask:
 			self.mask = numpy.add.outer((numpy.arange(y.size)-y.size//2)**2,(numpy.arange(x.size)-x.size//2)**2).flatten()<(.25*min(y.size**2, x.size**2))
 		else:
 			self.mask = numpy.ones(y.size*x.size, numpy.bool)
-
+			
+	@property
+	def shape(self):
+		return self.idz.shape+self.t.shape+self.e.shape+self.idz.shape+self.y.shape+self.x.shape
+	
+	@property
+	def fshape(self):
+		return (self.idz.size*self.t.size*self.e.size, self.idz.size*self.y.size*self.x.size)
 
 	def estimate_idz_range(self):
 		m_w = max(numpy.amax(self.x)-self.focus,-numpy.amin(self.x)+self.focus,numpy.amax(self.y)-self.focus,-numpy.amin(self.y)+self.focus)
@@ -77,6 +82,7 @@ class FresnelKernel2(Kernel):
 		
 		ssv = 8
 		ssu = 4
+		ssw = 4
 		
 		wimn = numpy.floor(wmn/dpw)
 		wimx = numpy.ceil(wmx/dpw)
@@ -88,7 +94,7 @@ class FresnelKernel2(Kernel):
 		
 		pu = supersample(self.dz, dpu, ssu).flatten()
 		pv = supersample(dpv*numpy.arange(-ssv*vimx, ssv*vimx+1, dtype=self.itype), dpv, ssv).flatten()
-		pw = dpw*numpy.arange(wimn, wimx+1, dtype=self.itype)
+		pw = supersample(dpw*numpy.arange(wimn, wimx+1, dtype=self.itype), dpw, ssw).flatten()
 		
 		kpu, kpv = FT.reciprocal_coords(pu,pv)
 		
@@ -96,23 +102,30 @@ class FresnelKernel2(Kernel):
 		
 		propf[:,kpu==0,kpv==0] = dpw/(2*numpy.pi)
 
-		pxmask = numpy.zeros(pu.shape+pv.shape, dtype=propf.dtype)
-		pxmask[pu.size//2-(ssu//2):pu.size//2+(ssu+1)//2, pv.size//2-(ssv//2):pv.size//2+(ssv+1)//2] = 1
-		fpxmask = FT.fft(pxmask)
+		upxmask = numpy.zeros(pu.shape, dtype=propf.dtype)
+		upxmask[pu.size//2-(ssu//2):pu.size//2+(ssu+1)//2] = 1
+		ufpxmask = FT.fft(upxmask)
+
+		vpxmask = numpy.zeros(pv.shape, dtype=propf.dtype)
+		vpxmask[pv.size//2-(ssv//2):pv.size//2+(ssv+1)//2] = 1
+		vfpxmask = FT.fft(vpxmask)
 		
-		propf *= fpxmask[None,:,:]
+		propf = numexpr.evaluate("propf*um*vm", local_dict=dict(propf=propf, um=ufpxmask[None,:,None], vm=vfpxmask[None,None,:]))
 
 		prop = FT.ifft(propf, axes=(1,2)).real.astype(self.dtype)
-		del propf
+
+		prop = scipy.ndimage.filters.convolve1d(prop, 1/ssw*numpy.ones(ssw, prop.dtype), axis=0)
 		
+		del propf
+	
 		prop = prop[:, pu.size//2-(ssu*uimx)-ssu//2:pu.size//2+(ssu*uimx)+(ssu//2), pv.size//2-(ssv*vimx)-ssv//2:pv.size//2+(ssv*vimx)+(ssv//2)]
 		prop = prop.reshape(prop.shape[0], 2*uimx+1, ssu, prop.shape[2]).mean(2)
 		pu = pu[pu.size//2-(ssu*uimx)-ssu//2:pu.size//2+(ssu*uimx)+(ssu//2)].reshape(2*uimx+1, ssu).mean(1)
 		pv = pv[pv.size//2-(ssv*vimx)-ssv//2:pv.size//2+(ssv*vimx)+(ssv//2)]
 		
-		sel = numexpr.evaluate('pi>=(v**2-ssv*dv**2+u**2-ssu*du**2)*k/(2*abs(w))', local_dict=dict(ssu=ssu, ssv=ssv, w=pw[:,None,None], u=pu[None,:,None], v=pv[None,None,:], pi=numpy.pi, k=self.k, du=pu[1]-pu[0], dv=pv[1]-pv[0]))
+		#sel = numexpr.evaluate('pi>=(v**2-ssv*dv**2+u**2-ssu*du**2)*k/(2*abs(w))', local_dict=dict(ssu=ssu, ssv=ssv, w=pw[:,None,None], u=pu[None,:,None], v=pv[None,None,:], pi=numpy.pi, k=self.k, du=pu[1]-pu[0], dv=pv[1]-pv[0]))
 		
-		prop[~sel] = 0
+		#prop[~sel] = 0
 		
 		dat_z = HA.HDFConcatenator(self.dtype)
 		te_z = HA.HDFConcatenator(self.itype)
@@ -139,7 +152,7 @@ class FresnelKernel2(Kernel):
 				sel = numexpr.evaluate('vmemax>=abs(v-e)', local_dict=dict(v=v[yx_idx],  e=self.e[e_idx], vmemax=vmemax))
 				sel[sel] = numexpr.evaluate('pi>=((v-e)**2-dv**2+z**2)*k/(2*abs(w))', local_dict=dict(z=zi, e=self.e[e_idx[sel]], w=w[yx_idx[sel]], v=v[yx_idx[sel]], pi=numpy.pi, k=self.k, dw=dyx, dv=dyx))
 				
-				#sel2 = numexpr.evaluate('pi>=((v-e)**2-dv**2+z**2)*k/(2*abs(w))', local_dict=dict(z=zi, e=self.e[e_idx], w=w[yx_idx], v=v[yx_idx], pi=numpy.pi, k=self.k, dw=dyx, dv=dyx))
+				#sel = numexpr.evaluate('pi>=((v-e)**2-dv**2+z**2)*k/(2*abs(w))', local_dict=dict(z=zi, e=self.e[e_idx], w=w[yx_idx], v=v[yx_idx], pi=numpy.pi, k=self.k, dw=dyx, dv=dyx))
 				
 				if numpy.count_nonzero(sel)>0:
 

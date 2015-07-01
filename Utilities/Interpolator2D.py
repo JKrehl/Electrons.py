@@ -32,6 +32,6 @@ class Interpolator2D:
 		yind = yind.astype(numpy.int)
 		xind = xind.astype(numpy.int)
 		
-		res = cy.interpolator_sub(yind, xind, yrem, xrem, self.data, self.ylength, self.xlength)
+		res = cy.interpolator2d(yind, xind, yrem, xrem, self.data, self.ylength, self.xlength)
 		
 		return res
