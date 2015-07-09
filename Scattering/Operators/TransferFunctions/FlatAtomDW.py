@@ -6,7 +6,7 @@ import numexpr
 import scipy.interpolate
 
 from ....Utilities import FourierTransforms as FT
-from ...Potentials.AtomPotentials import Kirkland
+from ...Potentials.AtomPotentials import WeickenmeierKohl
 
 from ..Base import PlaneOperator
 
@@ -18,14 +18,13 @@ def segment(a, keys=None):
     else:
         unique, inverse = numpy.unique(a, return_inverse=True)
     
-        
     return tuple(a[inverse==i] for i in xrange(len(unique)))
 
 class FlatAtomDW(PlaneOperator):
-	def __init__(self, y, x, atoms, phaseshifts_f=None, roi=None, yoi=None, xoi=None, kx=None, ky=None, kk=None, z=None, atom_potential_gen=Kirkland, energy=None, lazy=False, forgetful=False):
+	def __init__(self, y, x, atoms, phaseshifts_f=None, roi=None, yoi=None, xoi=None, kx=None, ky=None, kk=None, z=None, atom_potential_generator=WeickenmeierKohl, energy=None, lazy=False, forgetful=False):
 		self.__dict__.update(dict(x=x, y=y, atoms=atoms, z=z,
 								  roi=roi, yoi=yoi, xoi=xoi,
-								  phaseshifts_f=phaseshifts_f, atom_potential_gen=atom_potential_gen, energy=energy,
+								  phaseshifts_f=phaseshifts_f, atom_potential_generator=atom_potential_generator, energy=energy,
 								  kx=kx, ky=ky, kk=kk, lazy=lazy, forgetful=forgetful))
 
 		if roi is None and yoi is None and xoi is None:
@@ -39,16 +38,51 @@ class FlatAtomDW(PlaneOperator):
 
 		self.z = numpy.mean(self.atoms['zyx'][:,0])
 
+	@staticmethod
+	def prep(y, x, atoms, phaseshifts_f=None, roi=None, yoi=None, xoi=None, kx=None, ky=None, kk=None, z=None, atom_potential_generator=WeickenmeierKohl, energy=None, lazy=False, forgetful=False):
+		if roi is None and yoi is None and xoi is None:
+			patch = False
+		else:
+			patch = True
+			
+		if not patch:
+			
+			if phaseshifts_f is None:
+				phaseshifts_f = {i: atom_potential_generator.phaseshift_f(i, energy, x, y) for i in numpy.unique(atoms['Z'])}
+			
+			if kx is None or ky is None or kk is None:
+				kx, ky = FT.reciprocal_coords(x, y)
+				kk =  numpy.add.outer(kx**2, ky**2)
+			
+		else:
+			dy = y[1]-y[0]
+			dx = x[1]-x[0]
+			
+			
+			if yoi is None:
+				liyoi = numpy.ceil(roi/dy)
+				yoi = dy*numpy.arange(-liyoi, liyoi+1)
+			if xoi is None:
+				lixoi = numpy.ceil(roi/dx)
+				xoi = dx*numpy.arange(-lixoi, lixoi+1)
+		
+			if phaseshifts_f is None:
+				phaseshifts_f = {i: atom_potential_generator.phaseshift_f(i, energy, xoi, yoi) for i in numpy.unique(atoms['Z'])}
+			
+			if kx is None or ky is None or kk is None:
+				kx, ky = FT.reciprocal_coords(xoi, yoi)
+				kk =  numpy.add.outer(kx**2, ky**2)
+
+		return dict(phaseshifts_f=phaseshifts_f, roi=roi, yoi=yoi, xoi=xoi, atom_potential_generator=atom_potential_generator, energy=energy,kx=kx, ky=ky, kk=kk, lazy=lazy, forgetful=forgetful)
+		
 	def generate_tf(self):
 		if not self.patch:
 			
 			if self.phaseshifts_f is None:
-				self.phaseshifts_f = {i: self.atom_potential_gen.phaseshift_f(i, self.energy, self.x, self.y) for i in numpy.unique(self.atoms['Z'])}
+				self.phaseshifts_f = {i: self.atom_potential_generator.phaseshift_f(i, self.energy, self.x, self.y) for i in numpy.unique(self.atoms['Z'])}
 			
-			if self.kx is None or self.ky is None:
+			if self.kx is None or self.ky is None or self.kk is None:
 				self.kx, self.ky = FT.reciprocal_coords(self.x, self.y)
-			
-			if self.kk is None:
 				self.kk =  numpy.add.outer(self.kx**2, self.ky**2)
 				
 			tf = numpy.ones(self.kk.shape, dtype=numpy.complex)
@@ -66,7 +100,6 @@ class FlatAtomDW(PlaneOperator):
 			dy = self.y[1]-self.y[0]
 			dx = self.x[1]-self.x[0]
 			
-			
 			if self.yoi is None:
 				liyoi = numpy.ceil(self.roi/dy)
 				self.yoi = dy*numpy.arange(-liyoi, liyoi+1)
@@ -81,12 +114,10 @@ class FlatAtomDW(PlaneOperator):
 			
 		
 			if self.phaseshifts_f is None:
-				self.phaseshifts_f = {i: self.atom_potential_gen.phaseshift_f(i, self.energy, self.xoi, self.yoi) for i in numpy.unique(self.atoms['Z'])}
+				self.phaseshifts_f = {i: self.atom_potential_generator.phaseshift_f(i, self.energy, self.xoi, self.yoi) for i in numpy.unique(self.atoms['Z'])}
 			
-			if self.kx is None or self.ky is None:
+			if self.kx is None or self.ky is None or self.kk is None:
 				self.kx, self.ky = FT.reciprocal_coords(self.xoi, self.yoi)
-		
-			if self.kk is None:
 				self.kk =  numpy.add.outer(self.kx**2, self.ky**2)
 
 			tf = numpy.ones(self.y.shape+self.x.shape, dtype=numpy.complex)
@@ -115,7 +146,7 @@ class FlatAtomDW(PlaneOperator):
 	def apply(self, wave):
 		if self.transfer_function is None:
 			self.generate_tf()
-		res = self.transfer_function*wave
+		res = numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transfer_function, wave=wave))
 		if self.forgetful:
 			self.transfer_function = None
 		return res

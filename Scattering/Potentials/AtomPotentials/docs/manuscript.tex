@@ -1,6 +1,7 @@
 \documentclass{scrartcl}
 
 \usepackage{amsmath}
+\usepackage[exponent-product=\cdot]{siunitx}
 
 \title{Parametrizations for Scattering Potentials in high-energe TEM}
 \date{}
@@ -10,8 +11,9 @@
 \maketitle
 
 \def\vk{{\bf k}}
+\def\vr{{\bf r}}
 
-It should be noted that every quantity is in SI-units, regardless of what the originators of the parametrizations used. Also the spatial frequency is in the proper unit \(k = \frac{2 \pi}{\lambda}\).
+It should be noted that every quantity is in SI-units, regardless of what the originators of the parametrizations used. Also the spatial frequency is in the proper units, therefore \(k = \frac{2 \pi}{\lambda}\).
 
 \section{Weickenmeier-Kohl}
 
@@ -41,5 +43,19 @@ The atoms are paremtrized by 16 factors, which we will call \(A_1, ..., A_4\), \
 
 \section{Peng-Dudarev}
 
+The atoms are paremtrized by 10 factors, which we will call \(A_0, ..., A_4\), \(B_0, ..., B_4\) and can be found in the corresponding parameters file ``../parameters/kirkland\_coefficients.dat''.
+As the parameters have not been converted properly there is still the converseion factor \(c = \num{1e-20}\) in the exponents.
+
+\begin{align}
+  F(\vk) = \sum_{i=0...5} A_i\exp(-B_i c \vk^2)
+\end{align}
+
+\section{Wentzel, with Thomas-Fermi screening}
+
+The potentials are parametrized purely by the Z of the atoms.
+
+\begin{align}
+  V(\vr) &= -\frac{2 \gamma Z}{a_0} \frac{e^{-{|\vr|}/{R}}}{|\vr|} 
+\end{align}
 
 \end{document}

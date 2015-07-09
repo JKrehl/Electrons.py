@@ -20,3 +20,13 @@ class IntervalOperator:
 	
 	def split(self, z):
 		raise NotImplemented
+
+# class OperatorFactory:
+# 	def __init__(self, cls, *args, **kwargs):
+# 		self.cls = cls
+
+# 		self.cls.factory_init(self, *args, **kwargs)
+		
+# 	def create(self, *args, **kwargs):
+# 		self.cls.factory_new(self, *args, **kwargs)
+		
