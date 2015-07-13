@@ -1,4 +1,4 @@
-from __future__ import division, generators
+from __future__ import division, generators, unicode_literals
 
 import numpy, re
 
@@ -142,7 +142,7 @@ class Trafo3D(Trafo):
 		perm = 3-vector
 		"""
 
-		if kwargs.has_key('mat'): 
+		if 'mat' in kwargs: 
 			self.mat = kwargs['mat']
 		else:
 			self.mat = numpy.eye(4,dtype=numpy.float)

@@ -25,7 +25,6 @@ def map_coordinates3(
 
 	if threads==0:
 		threads = openmp.omp_get_max_threads()
-		print(threads)
 
 	cdef itype_t[:,:,:] zcoords = coords[0,:,:,:]
 	cdef itype_t[:,:,:] ycoords = coords[1,:,:,:]

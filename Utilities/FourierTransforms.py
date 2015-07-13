@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, unicode_literals
 
 import numpy
 import pyfftw
@@ -56,31 +56,31 @@ def mishift(ar, axes=None, axis=None):
 	
 	return numexpr.evaluate("ar*exp(-j*(%s))"%(''.join('fac%d+'%i for i in axes)[:-1]), local_dict=ldict)
 def fft(ar, *args, **kwargs):
-	if kwargs.has_key('axis'):
+	if 'axis' in kwargs:
 		kwargs['axes'] = (kwargs.pop('axis'),)
 	return pyfftw.builders.fftn(ar, *args, **kwargs)()
 
 def ifft(ar, *args, **kwargs):
-	if kwargs.has_key('axis'):
+	if 'axis' in kwargs:
 		kwargs['axes'] = (kwargs.pop('axis'),)
 	return pyfftw.builders.ifftn(ar, *args, **kwargs)()
 
 def mfft(ar, *args, **kwargs):
 	axes = None
-	if kwargs.has_key('axis'):
+	if 'axis' in kwargs:
 		axes = (kwargs.pop('axis'),)
 		kwargs['axes'] = axes
-	if kwargs.has_key('axes'):
+	if 'axes' in kwargs:
 		axes = kwargs['axes']
 		
 	return numpy.fft.fftshift(pyfftw.builders.fftn(numpy.fft.ifftshift(ar,axes=axes), *args, **kwargs)(),axes=axes)
 
 def mifft(ar, *args, **kwargs):
 	axes = None
-	if kwargs.has_key('axis'):
+	if 'axis' in kwargs:
 		axes = (kwargs.pop('axis'),)
 		kwargs['axes'] = axes
-	elif kwargs.has_key('axes'):
+	elif 'axes' in kwargs:
 		axes = kwargs['axes']
 	else:
 		axes = None

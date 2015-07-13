@@ -7,13 +7,13 @@ try:
 except ImportError:
     ipython = False
 
-import collections
-
-class Progress(collections.Iterator):
+class Progress():
     _value = -1
+    _iter = None
+    __iter__ = lambda self: self
     
     def __init__(self, iterable, length=None, keep=False):
-        self.iter = iterable.__iter__()
+        self._iter = iterable.__iter__()
         self.keep = keep
 
         if ipython:
@@ -43,11 +43,11 @@ class Progress(collections.Iterator):
             self.bar.value = self._value
             self.text.value = self.textfmt.format(self.bar.value)
     
-    def next(self):
+    def __next__(self):
         if ipython:
             self.value += 1
             try:
-                return self.iter.next()
+                return self._iter.__next__()
             except StopIteration:
                 if not self.keep:
                     self.box.close()

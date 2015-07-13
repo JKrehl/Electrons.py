@@ -37,7 +37,7 @@ def matvec(
 		threads = openmp.omp_get_max_threads()
 
 	with nogil, parallel(num_threads=threads):
-		for i in prange(stack_height, schedule='dynamic'):
+		for i in prange(stack_height, schedule='guided'):
 			vec_view = &vec[i*col_stride]
 			res_view = &res[i*row_stride]
 

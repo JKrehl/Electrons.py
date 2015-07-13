@@ -5,7 +5,12 @@ import scipy.sparse
 
 import h5py
 import copy
-import cPickle
+
+try:
+	import cPickle
+except ImportError:
+	import pickle
+
 import os.path
 import math
 

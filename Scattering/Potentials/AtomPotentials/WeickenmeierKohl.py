@@ -7,6 +7,7 @@ import numexpr
 from ....Utilities import FourierTransforms as FT
 from .Base import AtomPotentialGenerator
 
+import functools
 import os.path
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 
@@ -15,7 +16,7 @@ class WeickenmeierKohlClass(AtomPotentialGenerator):
 		self.coeff = {int(i[0]):i[1:] for i in numpy.loadtxt(__dir__+"/parameters/weickenmeier_kohl_coefficients.dat")}
 
 	def form_factors_k(self, Z, *k):
-		kk = reduce(numpy.add.outer,tuple((numpy.require(i))**2 for i in k), 0)
+		kk = functools.reduce(numpy.add.outer,tuple((numpy.require(i))**2 for i in k), 0)
 		A1 = (16*numpy.pi**2)*2.395e8*Z/(3.+3.*self.coeff[Z][0])
 		A4 = self.coeff[Z][0]*A1
 		B = self.coeff[Z][1:7]
@@ -29,7 +30,7 @@ class WeickenmeierKohlClass(AtomPotentialGenerator):
 		return re
 
 	def form_factors_r(self, Z, *x):
-		r = numpy.sqrt(reduce(numpy.add.outer,tuple(numpy.require(i)**2 for i in x), 0))
+		r = numpy.sqrt(functools.reduce(numpy.add.outer,tuple(numpy.require(i)**2 for i in x), 0))
 
 		A1 = (16*numpy.pi**2)*2.395e8*Z/(3.+3.*self.coeff[Z][0])
 		A4 = self.coeff[Z][0]*A1

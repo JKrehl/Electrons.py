@@ -1,4 +1,4 @@
-from __future__ import division, generators
+from __future__ import division, generators, unicode_literals
 
 import numpy
 import numexpr
@@ -33,10 +33,10 @@ class VolumeTrafo3D:
 			raise AttributeError
 
 		tzyxo = self.idxtrafo.inv.apply_to_bases(*tuple(numpy.arange(i) for i in self.shape))
-		self.proj_coords = numexpr.evaluate('x+y+z+o', local_dict=dict(z=tzyxo[0][:,:,None,None], y=tzyxo[1][:,None,:,None], x=tzyxo[2][:,None,None,:], o=tzyxo[3][:,None,None,None]))
+		self.proj_coords = numexpr.evaluate('z+y+x+o', local_dict=dict(z=tzyxo[0][:,:,None,None], y=tzyxo[1][:,None,:,None], x=tzyxo[2][:,None,None,:], o=tzyxo[3][:,None,None,None]))
 
 		zyxo = self.idxtrafo.apply_to_bases(*tuple(numpy.arange(i) for i in self.tshape))
-		self.bproj_coords = numexpr.evaluate('x+y+z+o', local_dict=dict(z=zyxo[0][:,:,None,None], y=zyxo[1][:,None,:,None], x=zyxo[2][:,None,None,:], o=zyxo[3][:,None,None,None]))
+		self.bproj_coords = numexpr.evaluate('z+y+x+o', local_dict=dict(z=zyxo[0][:,:,None,None], y=zyxo[1][:,None,:,None], x=zyxo[2][:,None,None,:], o=zyxo[3][:,None,None,None]))
 
 	def apply_to(self, a):
 		#return ndimage.interpolation.map_coordinates(a, self.proj_coords, order=1)
