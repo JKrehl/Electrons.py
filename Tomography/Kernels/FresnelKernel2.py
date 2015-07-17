@@ -6,13 +6,13 @@ import scipy.special
 import scipy.interpolate
 import scipy.ndimage
 
-from Physics.Utilities import Physics
-from Physics.Utilities import CoordinateTrafos as CT
-from Physics.Utilities import MemArray as MA
-from Physics.Utilities import Progress
-from Physics.Utilities import HDFArray as HA
-from Physics.Utilities import FourierTransforms as FT
-from Physics.Utilities import Interpolator2D
+from ...Utilities import Physics
+from ...Mathematics import CoordinateTrafos as CT
+from ...Utilities import MemArray as MA
+from ...Utilities import Progress
+from ...Utilities import HDFArray as HA
+from ...Mathematics import FourierTransforms as FT
+from ...Mathematics import Interpolator2D
 
 from .Base import Kernel
 

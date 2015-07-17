@@ -1,47 +1,43 @@
-from __future__ import absolute_import, division
-
 import numpy
 
 from ....Utilities.Physics import bohrr, echarge, interaction_const
-from ....Utilities import FourierTransforms as FT
+from ....Mathematics import FourierTransforms as FT
 
-class AtomPotentialGenerator:
+class AtomPotential:
 	def __init__(self):
 		pass
 
-	def form_factors_k(self, Z, *k):
+	@classmethod
+	def form_factors_k(cls, Z, *k):
 		raise NotImplementedError
 
-	def form_factors_r(self, Z, *x):
+	@classmethod
+	def form_factors_r(cls, Z, *x):
 		raise NotImplementedError
 
-	def potential_from_ff(self, ff):
-		return ff*2*numpy.pi*bohrr*echarge
+	@classmethod
+	def potential_r(cls, Z, *x):
+		return 2*numpy.pi*bohrr*echarge*cls.form_factors_r(Z, *x)
 
-	def potential_r(self, Z, *x):
-		return self.potential_from_ff(self.form_factors_r(Z, *x))
-
-	def potential_k(self, Z, *x, **kwargs):
-		if 'mask' in kwargs:
-			mask = kwargs['amsk']
-		else:
-			mask = None
-			
+	@classmethod
+	def potential_k(cls, Z, *x):
 		k = FT.reciprocal_coords(*x)
-		area = numpy.multiply.reduce(tuple(numpy.ptp(i) for i in x))
-		size = numpy.multiply.reduce(tuple(i.size for i in x))
+		
+		scaling = numpy.multiply.reduce(tuple(i[1]-i[0] for i in x))
+		
+		return 2*numpy.pi*bohrr*echarge*FT.ifft(FT.miwedge(cls.form_factors_k(Z, *k))).real/scaling
 
-		if mask is not None:
-			return self.potential_from_ff(abs(FT.mifft(mask*self.form_factors_k(Z, *k)))/(area/size))
+	@classmethod
+	def proj_potential(cls, Z, y, x, z=None):
+		if z is None:
+			return cls.potential_k(Z, y, x)
 		else:
-			return self.potential_from_ff(abs(FT.mifft(self.form_factors_k(Z, *k)))/(area/size))
+			return cls.potential_r(Z, z, y, x).sum(0)*(z[1]-z[0])
 
-	def potential(self, Z, *x):
-		return self.potential_k(Z, *x)
-	
-	def phaseshift(self, Z, energy,  *x):
-		return interaction_const(energy)*self.potential(Z, *x)
+	@classmethod
+	def phaseshift(cls, Z, energy, y, x, z=None):
+		return interaction_const(energy)*cls.proj_potential(Z, y, x, z)
 
-	def phaseshift_f(self, Z, energy, *x):
-		return FT.fft(self.phaseshift(Z, energy, *x))
-
+	@classmethod
+	def phaseshift_f(cls, Z, energy, y, x, z=None):
+		return FT.fft(cls.phaseshift(Z, energy, y, x, z))

@@ -28,6 +28,34 @@ def ishift(ar, axes=None, axis=None):
 		axes = (axis,)
 	return numpy.fft.ifftshift(ar, axes=axes)
 
+def mwedge(ar, axis=None, axes=None):
+	if axis is not None:
+		axes = (axis,)
+	if axes is None:
+		axes = range(ar.ndim)
+		
+	axes = tuple(i%ar.ndim for i in axes)
+	lengths = tuple(ar.shape[i] for i in axes)
+	
+	ldict = {'fac%d'%i:numpy.linspace(-numpy.pi/2*ar.shape[i], numpy.pi/2*ar.shape[i], ar.shape[i], False)[tuple(numpy.s_[:] if i==j else None for j in range(ar.ndim))] for i in axes}
+	ldict.update(j=1j,ar=ar)
+	
+	return numexpr.evaluate("ar*exp(j*(%s))"%(''.join('fac%d+'%i for i in axes)[:-1]), local_dict=ldict)
+
+def miwedge(ar, axis=None, axes=None):
+	if axis is not None:
+		axes = (axis,)
+	if axes is None:
+		axes = range(ar.ndim)
+		
+	axes = tuple(i%ar.ndim for i in axes)
+	lengths = tuple(ar.shape[i] for i in axes)
+	
+	ldict = {'fac%d'%i:numpy.linspace(-numpy.pi/2*ar.shape[i], numpy.pi/2*ar.shape[i], ar.shape[i], False)[tuple(numpy.s_[:] if i==j else None for j in range(ar.ndim))] for i in axes}
+	ldict.update(j=1j,ar=ar)
+	
+	return numexpr.evaluate("ar*exp(-j*(%s))"%(''.join('fac%d+'%i for i in axes)[:-1]), local_dict=ldict)
+
 def mshift(ar, axis=None, axes=None):
 	if axis is not None:
 		axes = (axis,)
@@ -37,7 +65,7 @@ def mshift(ar, axis=None, axes=None):
 	axes = tuple(i%ar.ndim for i in axes)
 	lengths = tuple(ar.shape[i] for i in axes)
 	
-	ldict = {'fac%d'%i:numpy.linspace(-numpy.pi/2*ar.shape[i], numpy.pi/2*ar.shape[i], ar.shape[i], False)[tuple(numpy.s_[:] if i==j else None for j in xrange(ar.ndim))] for i in axes}
+	ldict = {'fac%d'%i:numpy.linspace(-numpy.pi/2*ar.shape[i], numpy.pi/2*ar.shape[i], ar.shape[i], False)[tuple(numpy.s_[:] if i==j else None for j in range(ar.ndim))] for i in axes}
 	ldict.update(j=1j,ar=numpy.fft.fftshift(ar, axes=axes))
 	
 	return numexpr.evaluate("ar*exp(j*(%s))"%(''.join('fac%d+'%i for i in axes)[:-1]), local_dict=ldict)
@@ -51,10 +79,11 @@ def mishift(ar, axes=None, axis=None):
 	axes = tuple(i%ar.ndim for i in axes)
 	lengths = tuple(ar.shape[i] for i in axes)
 	
-	ldict = {'fac%d'%i:numpy.linspace(-numpy.pi/2*ar.shape[i], numpy.pi/2*ar.shape[i], ar.shape[i], False)[tuple(numpy.s_[:] if i==j else None for j in xrange(ar.ndim))] for i in axes}
-	ldict.update(j=1j,ar=numpy.fft.fftishift(ar, axes=axes))
+	ldict = {'fac%d'%i:numpy.linspace(-numpy.pi/2*ar.shape[i], numpy.pi/2*ar.shape[i], ar.shape[i], False)[tuple(numpy.s_[:] if i==j else None for j in range(ar.ndim))] for i in axes}
+	ldict.update(j=1j,ar=numpy.fft.ifftshift(ar, axes=axes))
 	
 	return numexpr.evaluate("ar*exp(-j*(%s))"%(''.join('fac%d+'%i for i in axes)[:-1]), local_dict=ldict)
+
 def fft(ar, *args, **kwargs):
 	if 'axis' in kwargs:
 		kwargs['axes'] = (kwargs.pop('axis'),)

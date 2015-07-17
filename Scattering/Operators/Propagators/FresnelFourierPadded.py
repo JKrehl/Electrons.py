@@ -3,7 +3,8 @@ from __future__ import absolute_import, division
 import numpy
 import numexpr
 from scipy import ndimage
-from ....Utilities import FourierTransforms as FT, Physics
+from ....Mathematics import FourierTransforms as FT
+from ....Utilities import Physics
 
 from ..Base import IntervalOperator
 

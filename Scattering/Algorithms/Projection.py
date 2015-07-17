@@ -3,11 +3,12 @@ from __future__ import absolute_import, division
 import numpy
 from ..Operators import OperatorChain
 from ..Operators.TransferFunctions import FlatAtomDW
-from ..Potentials.AtomPotentials import Kirkland
-from ...Utilities import FourierTransforms as FT, Progress
+from ..Potentials.AtomPotentials import WeickenmeierKohl
+from ...Mathematics import FourierTransforms as FT
+from ...Utilities import Progress
 
 class Projection:
-	def __init__(self, x, y, potential, energy, zi=None, zf=None, trafo=None, forgetful=False, atom_potential_generator=Kirkland, transfer_function=FlatAtomDW):
+	def __init__(self, x, y, potential, energy, zi=None, zf=None, trafo=None, forgetful=False, atom_potential_generator=WeickenmeierKohl, transfer_function=FlatAtomDW):
 		self.__dict__.update(dict(x=x, y=y, energy=energy,
 								  zi=zi, zf=zf, trafo=trafo,
 								  forgetful = forgetful,

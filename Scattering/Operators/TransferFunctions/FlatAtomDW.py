@@ -5,7 +5,7 @@ import numpy
 import numexpr
 import scipy.interpolate
 
-from ....Utilities import FourierTransforms as FT
+from ....Mathematics import FourierTransforms as FT
 from ...Potentials.AtomPotentials import WeickenmeierKohl
 
 from ..Base import PlaneOperator
@@ -65,7 +65,7 @@ class FlatAtomDW(PlaneOperator):
 			if xoi is None:
 				lixoi = numpy.ceil(roi/dx)
 				xoi = dx*numpy.arange(-lixoi, lixoi+1)
-		
+				
 			if phaseshifts_f is None:
 				phaseshifts_f = {i: atom_potential_generator.phaseshift_f(i, energy, xoi, yoi) for i in numpy.unique(atoms['Z'])}
 			
@@ -111,7 +111,6 @@ class FlatAtomDW(PlaneOperator):
 			else:
 				lixoi = (self.xoi.size-1)//2
 			
-			
 		
 			if self.phaseshifts_f is None:
 				self.phaseshifts_f = {i: self.atom_potential_generator.phaseshift_f(i, self.energy, self.xoi, self.yoi) for i in numpy.unique(self.atoms['Z'])}
@@ -126,19 +125,17 @@ class FlatAtomDW(PlaneOperator):
 				py, px = a['zyx'][1], a['zyx'][2]
 				rpy, ipy = numpy.modf((py-self.y[0])/dy)
 				rpx, ipx = numpy.modf((px-self.x[0])/dx)
-
-				itf = numexpr.evaluate('ps*exp(1j*(xs*kx+ys*ky)-kk*B/8)',
+				if (ipy+liyoi+1>=0)&(ipx+lixoi+1>=0):
+					itf = numexpr.evaluate('ps*exp(1j*(xs*kx+ys*ky)-kk*B/8)',
 									   local_dict={'ps':self.phaseshifts_f[a['Z']],
 												   'xs':rpx*dx,'ys':rpx*dy,
 												   'kx':self.kx[:,None], 'ky':self.ky[None,:],
 												   'kk':self.kk, 'B':a['B']})
-
-				sl = numpy.s_[ipy-liyoi if ipy-liyoi>=0 else 0:ipy+liyoi+1 if ipy+liyoi+1<=self.y.size else self.y.size,
-							  ipx-lixoi if ipx-lixoi>=0 else 0:ipx+lixoi+1 if ipx+lixoi+1<=self.x.size else self.x.size]
-				isl = numpy.s_[0 if ipy-liyoi>=0 else liyoi-ipy:self.yoi.size if ipy+liyoi+1<=self.y.size else self.y.size-(ipy+liyoi+1),
-							   0 if ipy-liyoi>=0 else liyoi-ipy:self.yoi.size if ipy+liyoi+1<=self.y.size else self.y.size-(ipy+liyoi+1)]
-				
-				tf[sl] *= numpy.exp(1j*FT.ifft(itf))[isl]
+					sl = numpy.s_[ipy-liyoi if ipy-liyoi>=0 else 0:ipy+liyoi+1 if ipy+liyoi+1<=self.y.size else self.y.size,
+								  ipx-lixoi if ipx-lixoi>=0 else 0:ipx+lixoi+1 if ipx+lixoi+1<=self.x.size else self.x.size]
+					isl = numpy.s_[0 if ipy-liyoi>=0 else liyoi-ipy:self.yoi.size if ipy+liyoi+1<=self.y.size else self.y.size-(ipy+liyoi+1),
+								   0 if ipx-lixoi>=0 else lixoi-ipx:self.xoi.size if ipx+lixoi+1<=self.x.size else self.x.size-(ipx+lixoi+1)]
+					tf[sl] *= numpy.exp(1j*FT.ifft(itf))[isl]
 				
 
 			self.transfer_function = tf

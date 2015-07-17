@@ -4,7 +4,11 @@ import numpy
 import numexpr
 import scipy.special
 
-from Physics.Utilities import Physics, CoordinateTrafos as CT, MemArray as MA, Progress, HDFArray as HA
+from ...Mathematics import CoordinateTrafos as CT
+from ...Utilities import Physics
+from ...Utilities import MemArray as MA
+from ...Utilities import Progress
+from ...Utilities import HDFArray as HA
 
 from .Base import Kernel
 

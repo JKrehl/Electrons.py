@@ -2,7 +2,7 @@ from __future__ import division, generators, unicode_literals
 
 import numpy, re
 
-from .Magic import lazy_property
+from ..Utilities.Magic import lazy_property
 
 def normalise_quart(quart):
 	quart = numpy.require(quart)

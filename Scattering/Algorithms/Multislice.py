@@ -5,7 +5,8 @@ from ..Operators import OperatorChain
 from ..Operators.TransferFunctions import FlatAtomDW
 from ..Operators.Propagators import FresnelFourier
 from ..Potentials.AtomPotentials import WeickenmeierKohl
-from ...Utilities import FourierTransforms as FT, Progress, Physics
+from ...Utilities import Progress, Physics
+from ...Mathematics import FourierTransforms as FT
 
 class Multislice:
 	def __init__(self, x, y, potential, energy, zi=None, zf=None, trafo=None, forgetful=False, roi=None, atom_potential_generator=WeickenmeierKohl, transfer_function=FlatAtomDW, propagator=FresnelFourier):

@@ -5,6 +5,7 @@ import os.path
 import tempfile
 import h5py
 import operator
+import functools
 
 class HDFConcatenator:
 	def __init__(self, dtype=None):
@@ -24,15 +25,15 @@ class HDFConcatenator:
 
 	@property
 	def sizes(self):
-		return [reduce(operator.mul, self.hfile[str(i)].shape) for i in xrange(self.i)]
+		return [functools.reduce(operator.mul, self.hfile[str(i)].shape) for i in range(self.i)]
 	
 	def concatenate(self):
-		size = (reduce(operator.add, [reduce(operator.mul, i.shape) for i in self.hfile.values()]),)
+		size = (functools.reduce(operator.add, [functools.reduce(operator.mul, i.shape) for i in self.hfile.values()]),)
 		arr = numpy.empty(size, self.dtype)
 
 		lb = 0
-		for i in xrange(self.i):
-			isize = reduce(operator.mul, self.hfile[str(i)].shape)
+		for i in range(self.i):
+			isize = functools.reduce(operator.mul, self.hfile[str(i)].shape)
 			if isize>0:
 				self.hfile[str(i)].read_direct(arr, dest_sel=numpy.s_[lb:lb+isize])
 				lb += isize
