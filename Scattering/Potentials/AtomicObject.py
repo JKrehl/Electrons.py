@@ -31,7 +31,7 @@ class AtomicObject:
 		if atoms is not None:
 			self.atoms = atoms.copy()
 
-		elif isinstance(file, basestring):
+		elif isinstance(file, str):
 			file = os.path.expanduser(file)
 			ext = os.path.splitext(file)[1]
 
@@ -45,9 +45,9 @@ class AtomicObject:
 				self.extent = data['extent']
 				self.atoms = self.atoms[numpy.argsort(self.atoms['zyx'][:,0])]
 			else:
-				raise NotImplemented
+				raise NotImplementedError
 		else:
-			raise NotImplemented
+			raise NotImplementedError
 
 		if trafo is not None:
 			self.transform(trafo)
@@ -63,10 +63,16 @@ class AtomicObject:
 		self.atoms[...] = self.atoms[numpy.argsort(self.atoms['zyx'][:,0])]
 
 	def zmin(self):
-		return numpy.amin(self.atoms['zyx'][:,0])
+		if self.atoms.size==0:
+			return 0
+		else:
+			return numpy.amin(self.atoms['zyx'][:,0])
 	
 	def zmax(self):
-		return numpy.amax(self.atoms['zyx'][:,0])
+		if self.atoms.size==0:
+			return 0
+		else:
+			return numpy.amax(self.atoms['zyx'][:,0])
 
 	def copy(self):
 		return self.__class__(atoms=self.atoms.copy())

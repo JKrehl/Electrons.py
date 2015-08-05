@@ -12,14 +12,10 @@ from ....Mathematics import get_laplace_kernel
 from ..Base import IntervalOperator
 
 class FresnelRealspace(IntervalOperator):
-	def __init__(self, zi, zf, k=None, y=None, x=None, r=1, kernel=None):
+	def __init__(self, zi, zf, k, y=None, x=None, r=1, kernel=None):
 		self.__dict__.update(dict(zi=zi,zf=zf, k=k, kernel=kernel))
 		if self.kernel is None:
 			self.kernel = get_laplace_kernel(r, y[1]-y[0], x[1]-x[0])
-			
-	@staticmethod
-	def prep(k, y, x):
-		return dict(k=k, y=y, x=x, r=1)
 
 	def apply(self, wave):
 		laplace = scipy.ndimage.convolve(wave.real, self.kernel, mode='constant', cval=1) + 1j*scipy.ndimage.convolve(wave.imag, self.kernel, mode='constant', cval=0)

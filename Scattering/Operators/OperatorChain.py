@@ -21,7 +21,10 @@ class OperatorChain(numpy.ndarray):
 	def get_gaps(self):
 		self.impose_zorder()
 		if self.size == 0:
-			return []
+			if self.zi != self.zf:
+				return [(self.zi, self.zf)]
+			else:
+				return []
 		else:
 			return [(zi,zf) for zi,zf in zip([self.zi]+list(self['zf']), list(self['zi'])+[self.zf]) if zi is not None and zf is not None and not zf==zi]
 

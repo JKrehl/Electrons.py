@@ -4,7 +4,6 @@ import scipy.optimize
 import scipy.special
 
 import numexpr
-from matplotlib.pyplot import *
 
 from . import FourierTransforms as FT
 
