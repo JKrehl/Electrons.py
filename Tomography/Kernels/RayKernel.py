@@ -1,5 +1,3 @@
-from __future__ import division, print_function
-
 import numpy
 import numexpr
 
@@ -31,6 +29,14 @@ class RayKernel(Kernel):
 	@property
 	def idx(self):
 		return (self.idx_te, self.idx_yx)
+
+	@property
+	def row(self):
+		return self.idx_te
+	
+	@property
+	def col(self):
+		return self.idx_yx
 	
 	def calc(self):
 		res = [[],[],[]]
@@ -60,7 +66,7 @@ class RayKernel(Kernel):
 			if self.mask is not None:
 				sel = numexpr.evaluate("mask&(abs(e)<(b+.5))", local_dict=dict(mask = self.mask[None,:], e=e, b=b))
 			else:
-				sel = numexpr.evaluate("(abs(e)<(b+.5)", local_dict=dict(e=e, b=b))
+				sel = numexpr.evaluate("(abs(e)<(b+.5))", local_dict=dict(e=e, b=b))
 
 			e = e[sel]
 			sel = idx[:,sel]

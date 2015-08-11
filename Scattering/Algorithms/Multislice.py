@@ -58,14 +58,13 @@ class Multislice:
 		
 
 		if self.thread is not None:
-			self.phaseshifts_f = {i: self.thread.to_device(self.atom_potential_generator.phaseshift_f(i, self.energy, self.y, self.x)) for i in numpy.unique(self.potential.atoms['Z'])}
 			self.g_y = self.thread.to_device(self.y)
 			self.g_x = self.thread.to_device(self.x)
 			self.g_ky = self.thread.to_device(self.ky)
 			self.g_kx = self.thread.to_device(self.kx)
 			self.g_kk = self.thread.to_device(self.kk)
-		else:
-			self.phaseshifts_f = {i: self.atom_potential_generator.phaseshift_f(i, self.energy, self.x, self.y) for i in numpy.unique(self.potential.atoms['Z'])}
+
+		self.transfer_function.ms_prep(self)
 		
 		i = 0
 		slice_thickness = Physics.wavenumber(self.energy)/(4*max(numpy.pi/(self.y[1]-self.y[0]), numpy.pi/(self.x[1]-self.x[0]))**2)

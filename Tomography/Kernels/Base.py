@@ -30,7 +30,6 @@ class Kernel:
 	dat = None
 	idx = None
 
-	@property
 	def as_coo(self):
 		return scipy.sparse.coo_matrix((self.dat, (self.col, self.row)), shape=self.fshape)
 	

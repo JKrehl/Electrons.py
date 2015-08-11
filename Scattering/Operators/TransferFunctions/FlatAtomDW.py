@@ -30,6 +30,10 @@ class FlatAtomDW(PlaneOperator):
 		
 		self.z = numpy.mean(self.atoms['zyx'][:,0])
 
+	@staticmethod
+	def ms_prep(parent):
+		parent.phaseshifts_f = {i: parent.atom_potential_generator.phaseshift_f(i, parent.energy, parent.y, parent.x) for i in numpy.unique(parent.potential.atoms['Z'])}
+	
 	@classmethod
 	def inherit(cls, parent, atoms, **kwargs):
 		args = {}
