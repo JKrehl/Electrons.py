@@ -27,33 +27,27 @@ class FlatAtomDW(PlaneOperator):
 		if not self.lazy:
 			self.generate_tf()
 
-		
 		self.z = numpy.mean(self.atoms['zyx'][:,0])
 
-	@staticmethod
-	def ms_prep(parent):
-		parent.phaseshifts_f = {i: parent.atom_potential_generator.phaseshift_f(i, parent.energy, parent.y, parent.x) for i in numpy.unique(parent.potential.atoms['Z'])}
-	
 	@classmethod
 	def inherit(cls, parent, atoms, **kwargs):
 		args = {}
 
-		if hasattr(parent, 'kk'):
-			args.update(dict(kk=parent.kk))
-		if hasattr(parent, 'ky') and hasattr(parent, 'kx'):
-			args.update(dict(ky=parent.ky, kx=parent.kx))
-		if hasattr(parent, 'y') and hasattr(parent, 'x'):
-			args.update(dict(y=parent.y, x=parent.x))
-		
-
-		if hasattr(parent, 'phaseshifts_f'):
-			args.update(dict(phaseshifts_f=parent.phaseshifts_f))
-		else:
-			args.update(dict(energy=parent.energy, x=parent.x, y=parent.y))
-			if hasattr(parent, 'atom_potential_generator'):
-				args.update(dict(atom_potential_generator=parent.atom_potential_generator))
-
+		args.update(parent.transfer_function_args)
 		args.update(kwargs)
+		args.update({s:parent.__dict__[s] for s in ['y', 'x', 'ky', 'kx', 'kk'] if s not in args or args[s] is None})
+
+		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+			if hasattr(parent, 'phaseshifts_f') and parent.phaseshifts_f is not None:
+				args['phaseshifts_f'] = parent.phaseshifts_f
+			else:
+				if 'energy' not in args or args['energy'] is None:
+					args['energy'] = parent.energy
+				if 'atom_potential_generator' not in args or args['atom_potential_generator'] is None:
+					args['atom_potential_generator'] = parent.atom_potential_generator
+				args['phaseshifts_f'] = {i: args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['y'], args['x']) for i in numpy.unique(atoms['Z'])}
+				
+		parent.transfer_function_args.update(args)
 
 		return cls(atoms, **args)
 			
@@ -80,10 +74,10 @@ class FlatAtomDW(PlaneOperator):
 		tf = numpy.zeros(kk.shape, dtype=self.dtype)
 
 		for a in self.atoms:
-			tf += numexpr.evaluate('ps*exp(1j*(xs*kx+ys*ky)-kk*B/8)',
+			tf += numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
 								   local_dict={'ps':self.phaseshifts_f[a['Z']],
-											   'xs':a['zyx'][2],'ys':a['zyx'][1],
-											   'kx':kx[:,None], 'ky':ky[None,:],
+											   'ys':a['zyx'][1], 'xs':a['zyx'][2],
+											   'ky':ky[:,None], 'kx':kx[None,:],
 											   'kk':kk, 'B':a['B']})
 
 		self.transfer_function = numpy.exp(1j*FT.ifft(tf))

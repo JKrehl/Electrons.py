@@ -5,8 +5,6 @@ import numpy
 import numexpr
 import scipy.interpolate
 
-from matplotlib.pyplot import *
-
 from ....Mathematics import FourierTransforms as FT
 from ...Potentials.AtomPotentials import WeickenmeierKohl
 
@@ -35,54 +33,16 @@ class FlatAtomDW_ROI(PlaneOperator):
 			self.generate_tf()
 		
 		self.z = numpy.mean(self.atoms['zyx'][:,0])
-
-	@staticmethod
-	def ms_prep(parent):
-		if hasattr(parent, 'roi_y') and hasattr(parent, 'roi_x'):
-			roi_y = parent.roi_y
-			roi_x = parent.roi_x
-		elif hasattr(parent, 'transfer_function_args') and ('roi_y' in parent.transfer_function_args and 'roi_x' in parent.transfer_function_args):
-			roi_y = parent.parent.transfer_function_args['roi_y']
-			roi_x = parent.parent.transfer_function_args['roi_x']
-		elif hasattr(parent, 'roi') or (hasattr(parent, 'transfer_function_args') and 'roi' in parent.transfer_function_args):
-			if hasattr(parent, 'roi'):
-				roi = parent.roi
-			else:
-				roi = parent.transfer_function_args['roi']
-
-			dy = parent.y[1]-parent.y[0]
-			dx = parent.x[1]-parent.x[0]
-			ay = numpy.ceil(roi/dy)
-			ax = numpy.ceil(roi/dx)
-			roi_y = dy*numpy.arange(-ay,ay+1)
-			roi_x = dx*numpy.arange(-ax,ax+1)
-		else:
-			raise ValueError
-		parent.phaseshifts_f = {i: parent.atom_potential_generator.phaseshift_f(i, parent.energy, roi_y, roi_x) for i in numpy.unique(parent.potential.atoms['Z'])}
-
+		
 	@classmethod
 	def inherit(cls, parent, atoms, **kwargs):
 		args = {}
-
-		if hasattr(parent, 'kk'):
-			args.update(dict(kk=parent.kk))
-		if hasattr(parent, 'ky') and hasattr(parent, 'kx'):
-			args.update(dict(ky=parent.ky, kx=parent.kx))
-		if hasattr(parent, 'y') and hasattr(parent, 'x'):
-			args.update(dict(y=parent.y, x=parent.x))
-			
-		if hasattr(parent, 'phaseshifts_f'):
-			args.update(dict(phaseshifts_f=parent.phaseshifts_f))
-		else:
-			args.update(dict(energy=parent.energy, x=parent.x, y=parent.y))
-			if hasattr(parent, 'atom_potential_generator'):
-				args.update(dict(atom_potential_generator=parent.atom_potential_generator))
-
-		if hasattr(parent, 'transfer_function_args'):
-			args.update(parent.transfer_function_args)
-
+		
+		args.update(parent.transfer_function_args)
 		args.update(kwargs)
-
+		
+		args.update({s:parent.__dict__[s] for s in ['y', 'x', 'ky', 'kx', 'kk'] if s not in args or args[s] is None})
+		
 		if 'roi' not in args or args['roi'] is None:
 			args['roi'] = 1e-9
 		
@@ -102,6 +62,21 @@ class FlatAtomDW_ROI(PlaneOperator):
 		if 'roi_kx' not in args or args['roi_kx'] is None:
 			args['roi_kx'] = FT.reciprocal_coords(args['roi_x'])
 			
+		if 'roi_kk' not in args or args['roi_kk'] is None:
+			args['roi_kk'] = numpy.add.outer(args['roi_ky']**2, args['roi_kx']**2)
+
+		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+			if hasattr(parent, 'phaseshifts_f') and parent.phaseshifts_f is not None:
+				args['phaseshifts_f'] = parent.phaseshifts_f
+			else:
+				if 'energy' not in args or args['energy'] is None:
+					args['energy'] = parent.energy
+				if 'atom_potential_generator' not in args or args['atom_potential_generator'] is None:
+					args['atom_potential_generator'] = parent.atom_potential_generator
+				args['phaseshifts_f'] = {i: args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x']) for i in numpy.unique(atoms['Z'])}
+			
+		parent.transfer_function_args.update(args)
+	
 		return cls(atoms, **args)
 			
 	def generate_tf(self):
@@ -157,7 +132,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 			roi_kk = self.roi_kk
 		
 		if self.phaseshifts_f is None:
-			self.phaseshifts_f = {i: self.atom_potential_generator.phaseshift_f(i, self.energy, yoi, xoi) for i in numpy.unique(self.atoms['Z'])}
+			self.phaseshifts_f = {i: self.atom_potential_generator.phaseshift_f(i, self.energy, roi_y, roi_x) for i in numpy.unique(self.atoms['Z'])}
 		
 		tf = numpy.ones(kk.shape, dtype=self.dtype)
 		itf = numpy.empty(roi_kk.shape, dtype=self.dtype)
@@ -173,14 +148,13 @@ class FlatAtomDW_ROI(PlaneOperator):
 			iselect = numpy.s_[0 if ipy+roi_yl>0 else ipy+roi_yl: roi_y.size if ipy+roi_yu<self.y.size else self.y.size-ipy-roi_yu,
 							   0 if ipx+roi_xl>0 else ipx+roi_xl: roi_x.size if ipx+roi_xu<self.x.size else self.x.size-ipx-roi_xu]
 
-			itf =  numexpr.evaluate('ps*exp(1j*(xs*kx+ys*ky)-kk*B/8)',
+			itf =  numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
 								   local_dict={'ps':self.phaseshifts_f[a['Z']],
-											   'ys':0*dy*rpy, 'xs':0*dx*rpx,
-											   'kx':roi_kx[:,None], 'ky':roi_ky[None,:],
+											   'ys':dy*rpy, 'xs':dx*rpx,
+											   'ky':roi_ky[:,None], 'kx':roi_kx[None,:],
 											   'kk':roi_kk, 'B':a['B']})
 			
 			tf[select] *= numpy.exp(1j*FT.ifft(itf))[iselect]
-			
 		self.transfer_function =tf
 
 	def apply(self, wave):

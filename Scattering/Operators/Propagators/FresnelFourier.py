@@ -4,11 +4,12 @@ import numpy
 import numexpr
 from scipy import ndimage
 from ....Mathematics import FourierTransforms as FT
+from ....Utilities import Physics
 
 from ..Base import IntervalOperator
 
 class FresnelFourier(IntervalOperator):
-	def __init__(self, zi, zf, k, kk=None, ky=None, kx=None, y=None, x=None):
+	def __init__(self, zi, zf, k=None, kk=None, ky=None, kx=None, y=None, x=None):
 		self.__dict__.update(dict(zi=zi,zf=zf, k=k, kk=kk))
 
 		if self.kk is None:
@@ -27,16 +28,17 @@ class FresnelFourier(IntervalOperator):
 
 	@classmethod
 	def inherit(cls, parent, zi, zf, **kwargs):
-		k = parent.k
 		args = {}
 
-		if hasattr(parent, 'kk'):
-			args.update(dict(kk = parent.kk))
-		elif hasattr(parent, 'ky') and hasattr(parent, 'kx'):
-			args.update(dict(ky = parent.ky, kx = parent.kx))
-		elif hasattr(parent, 'y') and hasattr(parent, 'x'):
-			args.update(dict(y = parent.y, x = parent.x))
+		args.update({k:v for k,v in parent.propagator_args.items() if v is not None})
+		args.update({k:v for k,v in kwargs.items() if v is not None})
 
-		args.update(kwargs)
-			
-		return cls(zi, zf, k, **args)
+		if not 'kk' in args or args['kk'] is None:
+			args['kk'] = parent.kk
+
+		if not 'k' in args or args['k'] is None:
+			args['k'] = Physics.wavenumber(parent.energy)
+
+		parent.propagator_args.update(args)
+		
+		return cls(zi, zf, **args)

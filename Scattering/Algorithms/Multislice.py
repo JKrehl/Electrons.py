@@ -2,9 +2,6 @@ from __future__ import absolute_import, division
 
 import numpy
 
-import reikna.cluda
-from reikna.cluda.api import Thread
-
 from ..Operators import OperatorChain
 from ..Operators.TransferFunctions import FlatAtomDW
 from ..Operators.Propagators import FresnelFourier
@@ -14,8 +11,13 @@ from ...Mathematics import FourierTransforms as FT
 
 class Multislice:
 	def __init__(self, y, x, potential, energy, zi=None, zf=None, trafo=None, atom_potential_generator=WeickenmeierKohl,
-				 transfer_function=FlatAtomDW, transfer_function_args={},
-				 propagator=FresnelFourier, propagator_args={}, thread=None):
+				 transfer_function=FlatAtomDW, transfer_function_args=None,
+				 propagator=FresnelFourier, propagator_args=None):
+
+		if transfer_function_args is None: transfer_function_args = {}
+		if propagator_args is None: propagator_args = {}
+
+		
 		self.__dict__.update(dict(y=y, x=x, energy=energy,
 								  zi=zi, zf=zf, trafo=trafo,
 								  atom_potential_generator=atom_potential_generator,
@@ -32,39 +34,16 @@ class Multislice:
 			self.zf = self.potential.zmax()
 		if self.zi is None:
 			self.zi = self.potential.zmin()
-
-		if thread is not None:
-			if isinstance(thread, Thread):
-				self.thread = thread
-			elif thread=='cuda':
-				self.thread = reikna.cluda.cuda_api().Thread.create()
-			elif thread=='ocl':
-				self.thread = reikna.cluda.ocl_api().Thread.create()
-			else:
-				raise ValueError
-		else:
-			self.thread = None
-			
+		
 	def prepare(self):
 		self.potential.zsort()
 		
 		self.opchain = OperatorChain(zi=self.zi, zf=self.zf)
 
 		self.k = Physics.wavenumber(self.energy)
-		k = self.k
-
+		
 		self.ky, self.kx = FT.reciprocal_coords(self.y, self.x)
 		self.kk = numpy.add.outer(self.ky**2, self.kx**2)
-		
-
-		if self.thread is not None:
-			self.g_y = self.thread.to_device(self.y)
-			self.g_x = self.thread.to_device(self.x)
-			self.g_ky = self.thread.to_device(self.ky)
-			self.g_kx = self.thread.to_device(self.kx)
-			self.g_kk = self.thread.to_device(self.kk)
-
-		self.transfer_function.ms_prep(self)
 		
 		i = 0
 		slice_thickness = Physics.wavenumber(self.energy)/(4*max(numpy.pi/(self.y[1]-self.y[0]), numpy.pi/(self.x[1]-self.x[0]))**2)
@@ -74,12 +53,11 @@ class Multislice:
 			while j<self.potential.atoms.size and self.potential.atoms['zyx'][j,0]<zi+slice_thickness:
 				j += 1
 
-			self.opchain.append(self.transfer_function.inherit(self, self.potential.atoms[i:j], **self.transfer_function_args))
-			
+			self.opchain.append(self.transfer_function.inherit(self, self.potential.atoms[i:j]))
 			i=j
 
 		for zi, zf in self.opchain.get_gaps():
-			self.opchain.append(self.propagator.inherit(self, zi, zf, **self.propagator_args))
+			self.opchain.append(self.propagator.inherit(self, zi, zf))
 
 		self.opchain.impose_zorder()
 		
@@ -91,9 +69,6 @@ class Multislice:
 	
 		if not self.prepared:
 			self.prepare()
-
-		if self.thread is not None and not hasattr(wave, 'thread'):
-			wave = self.thread.to_device(wave)
 	
 		if progress:
 			for op in Progress(self.opchain['operator'], self.opchain.size):
@@ -102,4 +77,7 @@ class Multislice:
 			for op in self.opchain['operator']:
 				wave = op.apply(wave)
 
+		if hasattr(wave, 'thread'):
+			wave = wave.get()
+			
 		return wave

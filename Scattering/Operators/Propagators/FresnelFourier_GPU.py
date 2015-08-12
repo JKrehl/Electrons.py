@@ -4,9 +4,11 @@ import numpy
 import numexpr
 from scipy import ndimage
 from ....Mathematics import FourierTransforms as FT
+from ....Utilities import Physics
 
 import reikna.core
 import reikna.fft
+from reikna.cluda.api import Thread
 
 from ..Base import IntervalOperator
 
@@ -45,7 +47,7 @@ class PhaseParabola(reikna.core.Computation):
 		return plan
 
 class FresnelFourier_GPU(IntervalOperator):
-	def __init__(self, thread, zi, zf, k, kk=None, ky=None, kx=None, y=None, x=None):
+	def __init__(self, zi, zf, thread=None, k=None, kk=None, ky=None, kx=None, y=None, x=None):
 		self.__dict__.update(dict(thread=thread, zi=zi,zf=zf, k=k, kk=kk))
 
 		if self.kk is None:
@@ -53,30 +55,46 @@ class FresnelFourier_GPU(IntervalOperator):
 				ky = FT.reciprocal_coords(y)
 			if kx is None:
 				kx = FT.reciprocal_coords(x)
-			
-			self.kk = numpy.add.outer(ky**2, kx**2)
+				
+			self.kk = self.thread.to_device(numpy.add.outer(ky**2, kx**2))
 
 		if not hasattr(self.kk, 'thread'):
 			self.kk = self.thread.to_device(self.kk)
 		elif self.kk.thread!=self.thread:
 			self.kk = self.thread.to_device(self.kk.get())
 			
-	@classmethod
-	def inherit(cls, parent, zi, zf, **kwargs):
-		thread = parent.thread
-		k = parent.k
+	@staticmethod
+	def inherit(parent, zi, zf, **kwargs):
 		args = {}
 
-		if hasattr(parent, 'g_kk'):
-			args.update(dict(kk = parent.g_kk))
-		if hasattr(parent, 'g_ky') and hasattr(parent, 'g_kx'):
-			args.update(dict(ky = parent.g_ky, kx = parent.g_kx))
-		#elif hasattr(parent, 'g_y') and hasattr(parent, 'g_x'):
-		#	args.update(dict(y = parent.g_y, x = parent.g_x))
+		args.update({k:v for k,v in parent.propagator_args.items() if v is not None})
+		args.update({k:v for k,v in kwargs.items() if v is not None})
 
-		args.update(kwargs)
+		if 'thread' in parent.transfer_function_args and isinstance(parent.transfer_function_args['thread'], Thread):
+			args['thread'] = parent.transfer_function_args['thread']
+		elif not 'thread' in args or args['thread'] is None:
+			args['thread'] = reikna.cluda.any_api().Thread.create()
+		elif isinstance(args['thread'], Thread):
+			pass
+		elif args['thread'] == 'cuda':
+			args['thread'] = reikna.cluda.cuda_api().Thread.create()
+		elif args['thread'] == 'opencl':
+			args['thread'] = reikna.cluda.ocl_api().Thread.create()
+		else:
+			raise ValueError
+		thread = args['thread']
+
+		args.update({s:thread.to_device(parent.__dict__[s]) for s in ['kk'] if s not in args or args[s] is None})
+
+		if not 'kk' in args or args['kk'] is None or not hasattr(args['kk'], 'thread') or args['kk'].thread != args['thread']:
+			args['kk'] = args['thread'].todevice(parent.kk)
+
+		if not 'k' in args or args['k'] is None:
+			args['k'] = Physics.wavenumber(parent.energy)
 			
-		return cls(thread, zi, zf, k, **args)
+		parent.propagator_args.update(args)
+			
+		return FresnelFourier_GPU(zi, zf, **args)
 
 	def apply(self, wave, tmp=None):
 		if not hasattr(wave, 'thread'):
