@@ -69,26 +69,27 @@ compiled_expi = {}
 	
 class Expi(reikna.core.Computation):
 	def __init__(self, arg):
-		super().__init__([reikna.core.Parameter('arg', reikna.core.Annotation(arg, 'io'))])
+		super().__init__([reikna.core.Parameter('res', reikna.core.Annotation(arg, 'io')),
+						  reikna.core.Parameter('arg', reikna.core.Annotation(arg, 'io'))])
 		
-	def _build_plan(self, plan_factory, device_params, arg):
+	def _build_plan(self, plan_factory, device_params, res, arg):
 		plan = plan_factory()
 
 		template = reikna.helpers.template_from(
 			"""
-			<%def name='function(kernel_declaration, arg)'>
+			<%def name='function(kernel_declaration, res, arg)'>
 				${kernel_declaration}
 				{
 				VIRTUAL_SKIP_THREADS;
 				const VSIZE_T idy = virtual_global_id(0);
 				const VSIZE_T idx = virtual_global_id(1);
-				${arg.store_idx}(idy, idx, ${exp}(${mul}(COMPLEX_CTR(${arg.ctype})(0,1), ${arg.load_idx}(idy, idx))));
+				${res.store_idx}(idy, idx, ${exp}(${mul}(COMPLEX_CTR(${arg.ctype})(0,1), ${arg.load_idx}(idy, idx))));
 				}
 			</%def>
 			""")
 			
 		plan.kernel_call(template.get_def('function'),
-						 [arg],
+						 [res, arg],
 						 global_size=arg.shape,
 						 render_kwds=dict(mul=reikna.cluda.functions.mul(arg.dtype, arg.dtype), exp=reikna.cluda.functions.exp(arg.dtype)))
 		return plan
@@ -138,16 +139,17 @@ class FlatAtomDW_GPU(PlaneOperator):
 		args.update({s:parent.__dict__[s] for s in ['y', 'x'] if s not in args or args[s] is None})
 		args.update({s:thread.to_device(parent.__dict__[s]) for s in ['ky', 'kx', 'kk'] if s not in args or args[s] is None})
 		
-
-		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None or not set(numpy.unique(atoms['Z'])).issubset(set(args['phaseshifts_f'].keys())):
 			if hasattr(parent, 'phaseshifts_f') and parent.phaseshifts_f is not None:
-				args['phaseshifts_f'] = {k:thread.to_device(v) for k,v in parent.phaseshifts_f.items()}
+				args['phaseshifts_f'] = parent.phaseshifts_f
 			else:
 				if 'energy' not in args or args['energy'] is None:
 					args['energy'] = parent.energy
 				if 'atom_potential_generator' not in args or args['atom_potential_generator'] is None:
 					args['atom_potential_generator'] = parent.atom_potential_generator
-				args['phaseshifts_f'] = {i: thread.to_device(args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['y'], args['x'])) for i in numpy.unique(atoms['Z'])}
+				if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+					args['phaseshifts_f'] = {}
+				args['phaseshifts_f'].update({i: thread.to_device(args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['y'], args['x'])) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 
 		parent.transfer_function_args.update(args)
 		return cls(atoms, **args)
@@ -220,8 +222,7 @@ class FlatAtomDW_GPU(PlaneOperator):
 			
 		tmp = self.thread.temp_array(tf.shape, tf.dtype, tf.strides)
 		fft_gpu(tmp, tf, 1)
-		tf[...] = tmp[...]
-		expi(tf)
+		expi(tf, tmp)
 	
 		self.transfer_function = tf
 

@@ -25,8 +25,8 @@ class VolumeTrafo3D:
 		self.idxtrafo = self.trafo.copy()
 		
 		if self.origin == 'center':
-			self.idxtrafo.add_preshift([-i//2 for i in self.shape])
-			self.idxtrafo.add_postshift([i//2 for i in self.tshape])
+			self.idxtrafo.preshift([-i//2 for i in self.shape])
+			self.idxtrafo.postshift([i//2 for i in self.tshape])
 		elif self.origin == 'zero':
 			pass
 		else:

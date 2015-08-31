@@ -64,8 +64,8 @@ class FlatAtomDW_ROI(PlaneOperator):
 			
 		if 'roi_kk' not in args or args['roi_kk'] is None:
 			args['roi_kk'] = numpy.add.outer(args['roi_ky']**2, args['roi_kx']**2)
-
-		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+			
+		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None or not set(numpy.unique(atoms['Z'])).issubset(set(args['phaseshifts_f'].keys())):
 			if hasattr(parent, 'phaseshifts_f') and parent.phaseshifts_f is not None:
 				args['phaseshifts_f'] = parent.phaseshifts_f
 			else:
@@ -73,7 +73,9 @@ class FlatAtomDW_ROI(PlaneOperator):
 					args['energy'] = parent.energy
 				if 'atom_potential_generator' not in args or args['atom_potential_generator'] is None:
 					args['atom_potential_generator'] = parent.atom_potential_generator
-				args['phaseshifts_f'] = {i: args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x']) for i in numpy.unique(atoms['Z'])}
+				if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+					args['phaseshifts_f'] = {}
+				args['phaseshifts_f'].update({i: args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x']) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 			
 		parent.transfer_function_args.update(args)
 	
@@ -148,7 +150,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 			iselect = numpy.s_[0 if ipy+roi_yl>0 else ipy+roi_yl: roi_y.size if ipy+roi_yu<self.y.size else self.y.size-ipy-roi_yu,
 							   0 if ipx+roi_xl>0 else ipx+roi_xl: roi_x.size if ipx+roi_xu<self.x.size else self.x.size-ipx-roi_xu]
 
-			itf =  numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
+			itf = numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
 								   local_dict={'ps':self.phaseshifts_f[a['Z']],
 											   'ys':dy*rpy, 'xs':dx*rpx,
 											   'ky':roi_ky[:,None], 'kx':roi_kx[None,:],

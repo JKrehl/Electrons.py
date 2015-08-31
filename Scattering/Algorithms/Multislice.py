@@ -78,6 +78,10 @@ class Multislice:
 				wave = op.apply(wave)
 
 		if hasattr(wave, 'thread'):
+			thread = wave.thread
 			wave = wave.get()
+			thread.synchronize()
+			thread.release()
+			del thread
 			
 		return wave

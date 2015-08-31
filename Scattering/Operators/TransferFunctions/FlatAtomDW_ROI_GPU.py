@@ -14,8 +14,6 @@ from ....Mathematics import FourierTransforms as FT
 from ...Potentials.AtomPotentials import WeickenmeierKohl
 
 from ..Base import PlaneOperator
-
-compiled_atom_phaseshift = {}
 	
 class AtomPhaseshift(reikna.core.Computation):
 	def __init__(self, tf, ps, ys, xs, B, ky, kx, kk):
@@ -39,7 +37,7 @@ class AtomPhaseshift(reikna.core.Computation):
 				VIRTUAL_SKIP_THREADS;
 				const VSIZE_T idy = virtual_global_id(0);
 				const VSIZE_T idx = virtual_global_id(1);
-				${tf.store_idx}(idy, idx, ${mulp}(${ps.load_idx}(idy, idx), ${expx}(${addx}(${muli}(COMPLEX_CTR(float2)(0,-1), ${adds}(${muly}(${ys}, ${ky.load_idx}(idy)), ${mulx}(${xs}, ${kx.load_idx}(idx)))), ${mulB}(-${B}/8, ${kk.load_idx}(idy,idx))))));
+				${tf.store_idx}(idy, idx, ${mulp}(${ps.load_idx}(idy, idx), ${expx}(${addx}(${muli}(COMPLEX_CTR(float2)(0,1), ${adds}(${muly}(${ys}, ${ky.load_idx}(idy)), ${mulx}(${xs}, ${kx.load_idx}(idx)))), ${mulB}(-${B}/8., ${kk.load_idx}(idy,idx))))));
 				}
 			</%def>
 			""")
@@ -65,44 +63,88 @@ class AtomPhaseshift(reikna.core.Computation):
 									  ))
 		return plan
 	
-compiled_expi = {}
-	
 class Expi(reikna.core.Computation):
 	def __init__(self, arg):
-		super().__init__([reikna.core.Parameter('arg', reikna.core.Annotation(arg, 'io'))])
+		super().__init__([reikna.core.Parameter('res', reikna.core.Annotation(arg, 'o')),
+						  reikna.core.Parameter('arg', reikna.core.Annotation(arg, 'i'))])
 		
-	def _build_plan(self, plan_factory, device_params, arg):
+	def _build_plan(self, plan_factory, device_params, res, arg):
 		plan = plan_factory()
 
 		template = reikna.helpers.template_from(
 			"""
-			<%def name='function(kernel_declaration, arg)'>
+			<%def name='function(kernel_declaration, res, arg)'>
 				${kernel_declaration}
 				{
 				VIRTUAL_SKIP_THREADS;
 				const VSIZE_T idy = virtual_global_id(0);
 				const VSIZE_T idx = virtual_global_id(1);
-				${arg.store_idx}(idy, idx, ${exp}(${mul}(COMPLEX_CTR(${arg.ctype})(0,1), ${arg.load_idx}(idy, idx))));
+				${res.store_idx}(idy, idx, ${exp}(${mul}(COMPLEX_CTR(${arg.ctype})(0,1), ${div}(${arg.load_idx}(idy, idx), ${f}))));
 				}
 			</%def>
 			""")
 			
 		plan.kernel_call(template.get_def('function'),
-						 [arg],
+						 [res, arg],
 						 global_size=arg.shape,
-						 render_kwds=dict(mul=reikna.cluda.functions.mul(arg.dtype, arg.dtype), exp=reikna.cluda.functions.exp(arg.dtype)))
+						 render_kwds=dict(mul=reikna.cluda.functions.mul(arg.dtype, arg.dtype, out_dtype=res.dtype),
+										  exp=reikna.cluda.functions.exp(res.dtype),
+										  div = reikna.cluda.functions.div(arg.dtype, int, out_dtype=arg.dtype),
+										  f=arg.size))
 		return plan
 
-compiled_fft_gpu = {}
+class RegionMult(reikna.core.Computation):
+	def __init__(self, A, B):
+		super().__init__([reikna.core.Parameter('A', reikna.core.Annotation(A, 'io')),
+						  reikna.core.Parameter('B', reikna.core.Annotation(B, 'i')),
+						  reikna.core.Parameter('Aoff0', reikna.core.Annotation(numpy.uint, 's')),
+						  reikna.core.Parameter('Aoff1', reikna.core.Annotation(numpy.uint, 's')),
+						  reikna.core.Parameter('Boff0', reikna.core.Annotation(numpy.uint, 's')),
+						  reikna.core.Parameter('Boff1', reikna.core.Annotation(numpy.uint, 's')),
+						  reikna.core.Parameter('len0', reikna.core.Annotation(numpy.uint, 's')),
+						  reikna.core.Parameter('len1', reikna.core.Annotation(numpy.uint, 's')),
+						 ])
+		
+	def _build_plan(self, plan_factory, device_params, A, B, Aoff0, Aoff1, Boff0, Boff1, len0, len1):
+		plan = plan_factory()
+
+		template = reikna.helpers.template_from(
+			"""
+			<%def name='function(kernel_declaration, A, B, Aoff0, Aoff1, Boff0, Boff1, len0, len1)'>
+				${kernel_declaration}
+				{
+				VIRTUAL_SKIP_THREADS;
+				const VSIZE_T idx0 = virtual_global_id(0);
+				const VSIZE_T idx1 = virtual_global_id(1);
+				//if(idx0<${len0} && idx1<${len1}){
+					//${A.store_idx}(idx0+${Aoff0}, idx1+${Aoff1}, ${mul}(${A.load_idx}(idx0+${Aoff0}, idx1+${Aoff1}), ${B.load_idx}(idx0+${Boff0}, idx1+${Boff1})));
+				${A.store_idx}(${add}(idx0, ${Aoff0}), ${add}(idx1, ${Aoff1}), ${mul}(${A.load_idx}(${add}(idx0, ${Aoff0}), ${add}(idx1, ${Aoff1})), ${B.load_idx}(${add}(idx0, ${Boff0}), ${add}(idx1, ${Boff1}))));
+				//}
+				}
+			</%def>
+			""")
+		
+		plan.kernel_call(template.get_def('function'),
+						 [A,B, Aoff0, Aoff1, Boff0, Boff1, len0, len1],
+						 global_size=tuple(min(a,b) for a,b in zip(A.shape, B.shape)),
+						 render_kwds=dict(mul=reikna.cluda.functions.mul(A.dtype, B.dtype, out_dtype=A.dtype),
+										 add=reikna.cluda.functions.add(numpy.uint, numpy.uint)))
+		return plan
 	
 class FlatAtomDW_ROI_GPU(PlaneOperator):
+	
 	def __init__(self, atoms, thread=None, phaseshifts_f=None,
 				 ky=None, kx=None, kk=None,
 				 roi=None, roi_x=None, roi_y=None,
 				 roi_ky=None, roi_kx=None, roi_kk=None,
 				 atom_potential_generator=WeickenmeierKohl, energy=None, y=None, x=None,
 				 dtype=numpy.complex,
-				 lazy=True, forgetful=True):
+				 lazy=True, forgetful=True,
+				 compiled_atom_phaseshift=None,
+				 compiled_expi=None,
+				 compiled_fft_gpu=None,
+				 compiled_mult=None,
+	):
 		self.__dict__.update(dict(thread=thread, atoms=atoms,
 								  phaseshifts_f=phaseshifts_f,
 								  ky=ky, kx=kx, kk=kk,
@@ -110,7 +152,17 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 								  roi_ky=roi_ky, roi_kx=roi_kx, roi_kk=roi_kk,
 								  atom_potential_generator=atom_potential_generator, energy=energy, y=y, x=x,
 								  dtype=dtype,
-								  lazy=lazy, forgetful=forgetful))
+								  lazy=lazy, forgetful=forgetful,
+								  compiled_atom_phaseshift=compiled_atom_phaseshift,
+								  compiled_expi=compiled_expi,
+								  compiled_fft_gpu=compiled_fft_gpu,
+								  compiled_mult=compiled_mult,
+							  ))
+
+		if self.compiled_atom_phaseshift is None: self.compiled_atom_phaseshift={}
+		if self.compiled_expi is None: self.compiled_expi={}
+		if self.compiled_fft_gpu is None: self.compiled_fft_gpu={}
+		if self.compiled_mult is None: self.compiled_mult={}
 		
 		self.transfer_function = None
 		if not self.lazy:
@@ -164,16 +216,29 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 		if 'roi_kk' not in args or args['roi_kk'] is None:
 			args['roi_kk'] = thread.to_device(numpy.add.outer(args['roi_ky'].get()**2, args['roi_kx'].get()**2))
 
-		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None or not set(numpy.unique(atoms['Z'])).issubset(set(args['phaseshifts_f'].keys())):
 			if hasattr(parent, 'phaseshifts_f') and parent.phaseshifts_f is not None:
-				args['phaseshifts_f'] = {k:thread.to_device(v) for k,v in parent.phaseshifts_f.items()}
+				args['phaseshifts_f'] = parent.phaseshifts_f
 			else:
 				if 'energy' not in args or args['energy'] is None:
 					args['energy'] = parent.energy
 				if 'atom_potential_generator' not in args or args['atom_potential_generator'] is None:
 					args['atom_potential_generator'] = parent.atom_potential_generator
-				args['phaseshifts_f'] = {i: thread.to_device(args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x'])) for i in numpy.unique(atoms['Z'])}
+				if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+					args['phaseshifts_f'] = {}
+				args['phaseshifts_f'].update({i: thread.to_device(args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x'])) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 
+		if 'compiled_atom_phaseshift' not in args or args['compiled_atom_phaseshift'] is None:
+			args['compiled_atom_phaseshift'] = {}
+		if 'compiled_expi' not in args or args['compiled_expi'] is None:
+			args['compiled_expi'] = {}
+		if 'compiled_fft_gpu' not in args or args['compiled_fft_gpu'] is None:
+			args['compiled_fft_gpu'] = {}
+		if 'compiled_mult' not in args or args['compiled_mult'] is None:
+			args['compiled_mult'] = {}
+
+			
+		
 		parent.transfer_function_args.update(args)
 		return cls(atoms, **args)
 			
@@ -200,7 +265,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 			kk = self.kk
 
 		if self.roi_y is None:
-			roi_yl = -numpy.ceil(self.roi/dy)
+			roi_yl = -numpy.ceil(self.roi/dy)-1
 			roi_yu = numpy.ceil(self.roi/dy)+1
 			roi_y = dy*numpy.arange(roi_yl, roi_yu)
 		else:
@@ -209,7 +274,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 			roi_yu = (roi_y.size+1)//2
 			
 		if self.roi_x is None:
-			roi_xl = -numpy.ceil(self.roi/dx)
+			roi_xl = -numpy.ceil(self.roi/dx)-1
 			roi_xu = numpy.ceil(self.roi/dx)+1
 			roi_x = dx*numpy.arange(roi_xl, roi_xu)
 		else:
@@ -240,7 +305,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 			kk = self.thread.to_device(kk)
 
 			
-		tf = numpy.ones(kk.shape, self.dtype)
+		self.transfer_function = self.thread.to_device(numpy.ones(kk.shape, self.dtype))
 		itf = self.thread.array(roi_kk.shape, self.dtype)
 		tmp = self.thread.temp_array(itf.shape, itf.dtype, itf.strides)
 
@@ -253,51 +318,62 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 				reikna.core.Type.from_value(roi_kx).__repr__(),
 				reikna.core.Type.from_value(roi_kk).__repr__())
 
-		if sign in compiled_atom_phaseshift:
-			atom_phaseshift = compiled_atom_phaseshift[sign]
+		if sign in self.compiled_atom_phaseshift:
+			atom_phaseshift = self.compiled_atom_phaseshift[sign]
 		else:
 			atom_phaseshift =  AtomPhaseshift(itf, list(phaseshifts_f.values())[0], self.atoms['zyx'][0,1], self.atoms['zyx'][0,2], self.atoms[0]['B'], roi_ky, roi_kx, roi_kk).compile(self.thread)
-			compiled_atom_phaseshift[sign] = atom_phaseshift
+			self.compiled_atom_phaseshift[sign] = atom_phaseshift
 			
 		xsign = (self.thread, reikna.core.Type.from_value(itf).__repr__())
 
-		if xsign in compiled_expi:
-			expi = compiled_expi[xsign]
+		if xsign in self.compiled_expi:
+			expi = self.compiled_expi[xsign]
 		else:
 			expi = Expi(itf).compile(self.thread)
-			compiled_expi[xsign] = expi
+			self.compiled_expi[xsign] = expi
 
-		if xsign in compiled_fft_gpu:
-			fft_gpu = compiled_fft_gpu[xsign]
+		if xsign in self.compiled_fft_gpu:
+			fft_gpu = self.compiled_fft_gpu[xsign]
 		else:
 			fft_gpu = reikna.fft.FFT(itf).compile(self.thread)
-			compiled_fft_gpu[xsign] = fft_gpu
+			self.compiled_fft_gpu[xsign] = fft_gpu
+
+		msign = (self.thread, reikna.core.Type.from_value(self.transfer_function).__repr__(), reikna.core.Type.from_value(itf).__repr__())
+		
+		if msign in self.compiled_fft_gpu:
+			mult = self.compiled_mult[msign]
+		else:
+			mult = RegionMult(self.transfer_function, itf).compile(self.thread)
+			self.compiled_mult[msign] = mult
 
 		dy = self.y[1]-self.y[0]
 		dx = self.x[1]-self.x[0]
 		
 		for a in self.atoms:
 			py, px = a['zyx'][1], a['zyx'][2]
+				
 			rpy, ipy = numpy.modf((py-self.y[0])/dy)
 			rpx, ipx = numpy.modf((px-self.x[0])/dx)
 			ipy = int(ipy)
 			ipx = int(ipx)
 			
 			atom_phaseshift(itf, phaseshifts_f[a['Z']], rpy*dy, rpx*dx, a['B'], roi_ky, roi_kx, roi_kk)
-			
-			fft_gpu(tmp, itf, 1)
-			itf[...] = tmp[...]
-			expi(itf)
-			
+				
+			fft_gpu(tmp, itf, 0)
+			#tmp /= itf.size
+			expi(itf, tmp)
+				
 			select = numpy.s_[ipy+roi_yl if ipy+roi_yl>=0 else 0:ipy+roi_yu if ipy+roi_yu<=self.y.size else self.y.size,
 							  ipx+roi_xl if ipx+roi_xl>=0 else 0:ipx+roi_xu if ipx+roi_xu<=self.x.size else self.x.size]
 
-			iselect = numpy.s_[0 if ipy+roi_yl>0 else ipy+roi_yl: roi_y.size if ipy+roi_yu<self.y.size else self.y.size-ipy-roi_yu,
-							   0 if ipx+roi_xl>0 else ipx+roi_xl: roi_x.size if ipx+roi_xu<self.x.size else self.x.size-ipx-roi_xu]
+			iselect = numpy.s_[0 if ipy+roi_yl>=0 else -(ipy+roi_yl): roi_y.size if ipy+roi_yu<=self.y.size else self.y.size+self.roi_y.size-ipy-roi_yu,
+							   0 if ipx+roi_xl>=0 else -(ipx+roi_xl): roi_x.size if ipx+roi_xu<=self.x.size else self.x.size+self.roi_x.size-ipx-roi_xu]
+				
+			assert select[0].stop-select[0].start==iselect[0].stop-iselect[0].start and select[1].stop-select[1].start==iselect[1].stop-iselect[1].start, (py, self.y[0], dy, select, iselect)
+			if (select[0].stop-select[0].start)>0 and (select[1].stop-select[1].start)>0:
+				mult(self.transfer_function, itf, select[0].start, select[1].start, iselect[0].start, iselect[1].start, select[0].stop-select[0].start, select[1].stop-select[1].start)
 
-			tf[select] *= itf.get()[iselect]
-	
-		self.transfer_function = self.thread.to_device(tf)
+		del itf
 
 	def apply(self, wave):
 		if not hasattr(wave, 'thread') or wave.thread != self.thread:
@@ -305,7 +381,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 		
 		if self.transfer_function is None:
 			self.generate_tf()
-		
+			
 		wave *= self.transfer_function
 		
 		if self.forgetful:

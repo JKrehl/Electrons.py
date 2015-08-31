@@ -7,7 +7,7 @@ import h5py
 import copy
 
 try:
-	import cPickle
+	import cPickle as pickle
 except ImportError:
 	import pickle
 
@@ -49,7 +49,7 @@ class Kernel:
 				hfile.create_dataset(name, data=self.__dict__[name])
 				setattr(stripped_self, name, None)
 				
-			hfile.attrs['self'] = numpy.void(cPickle.dumps(stripped_self))
+			hfile.attrs['self'] = numpy.void(pickle.dumps(stripped_self))
 			
 		print("written: {:>8g}{:s}".format(*humanize_filesize(os.path.getsize(filename))))
 
@@ -58,9 +58,9 @@ class Kernel:
 		filename = os.path.expanduser(filename)
 
 		with h5py.File(filename, mode='r') as hfile:
-			self = cPickle.loads(str(hfile.attrs['self']))
+			self = pickle.loads(bytes(hfile.attrs['self']))
 
-			for name, value in hfile.iteritems():
+			for name, value in hfile.items():
 				self.__dict__[name] = numpy.require(value)
 
 		return self

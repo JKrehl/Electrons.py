@@ -136,7 +136,7 @@ class Trafo3D(Trafo):
 
 	def affine_transform(self, affine):
 		self.mat = numpy.dot(affine_to_4mat(numpy.require(value)), self.mat)
-		return self
+		return 
 
 	def quarternion(self, quart):
 		self.mat = numpy.dot(affine_to_4mat(quart_to_rotmat(normalise_quart(value))), self.mat)

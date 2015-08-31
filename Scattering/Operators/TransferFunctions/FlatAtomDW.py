@@ -37,7 +37,7 @@ class FlatAtomDW(PlaneOperator):
 		args.update(kwargs)
 		args.update({s:parent.__dict__[s] for s in ['y', 'x', 'ky', 'kx', 'kk'] if s not in args or args[s] is None})
 
-		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None or not set(numpy.unique(atoms['Z'])).issubset(set(args['phaseshifts_f'].keys())):
 			if hasattr(parent, 'phaseshifts_f') and parent.phaseshifts_f is not None:
 				args['phaseshifts_f'] = parent.phaseshifts_f
 			else:
@@ -45,7 +45,9 @@ class FlatAtomDW(PlaneOperator):
 					args['energy'] = parent.energy
 				if 'atom_potential_generator' not in args or args['atom_potential_generator'] is None:
 					args['atom_potential_generator'] = parent.atom_potential_generator
-				args['phaseshifts_f'] = {i: args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['y'], args['x']) for i in numpy.unique(atoms['Z'])}
+				if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
+					args['phaseshifts_f'] = {}
+				args['phaseshifts_f'].update({i: args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['y'], args['x']) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 				
 		parent.transfer_function_args.update(args)
 
