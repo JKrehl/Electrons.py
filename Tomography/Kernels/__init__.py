@@ -4,5 +4,6 @@ from .Base import Kernel
 from .RayKernel import RayKernel
 from .FresnelKernel import FresnelKernel
 from .FresnelKernel2 import FresnelKernel2
+from .FresnelKernel3 import FresnelKernel3
 
 __all__ = [s for s in dir() if not s.startswith('_')]

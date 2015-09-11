@@ -227,10 +227,12 @@ class Trafo2D(Trafo):
 		mt = numpy.eye(3, dtype=self.mat.dtype)
 		mt[:2,:2] = ((numpy.cos(angle), -numpy.sin(angle)),(numpy.sin(angle), numpy.cos(angle)))
 		self.mat = numpy.dot(mt, self.mat)
-
 		return self
 
-	def rotation_deg(self, angle):
+	def rad(self, angle):
+		return self.rotation(angle)
+	
+	def deg(self, angle):
 		return self.rotation(numpy.deg2rad(angle))
 
 	def postscale(self, value):

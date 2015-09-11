@@ -68,7 +68,7 @@ class FresnelKernel2(Kernel):
 		wmx = -numpy.inf
 
 		for it, ti in Progress(enumerate(self.t), self.t.size, True):
-			trafo = CT.Trafo2D(rad=ti)
+			trafo = CT.Trafo2D().rad(ti)
 			w,v,o = trafo.apply_to_bases(self.y,self.x)
 			w,v = numexpr.evaluate("w+v+o", local_dict=dict(w=w[:,:,None],v=v[:,None,:],o=o[:,None,None])).reshape(2, self.y.size*self.x.size)
 			w -= self.focus

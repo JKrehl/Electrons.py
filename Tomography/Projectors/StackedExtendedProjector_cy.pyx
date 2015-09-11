@@ -15,6 +15,8 @@ ctypedef fused dat_t:
 	numpy.float32_t
 	numpy.float64_t
 	numpy.float_t
+	numpy.complex64_t
+	numpy.complex128_t
 
 def matvec(
 		dat_t[:] vec,

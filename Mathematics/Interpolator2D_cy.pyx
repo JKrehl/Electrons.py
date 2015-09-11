@@ -40,7 +40,7 @@ def interpolator2d(itype_t[:] yind,
 	
 	cdef itype_t yl = ylength, xl = xlength
 	
-	cdef dtype_t[:] res = numpy.empty(coordlength, numpy.obj2sctype(data))
+	cdef dtype_t[:] res = numpy.empty(coordlength, numpy.obj2sctype(numpy.array(data)))
 	
 	cdef Py_ssize_t i
 	cdef itype_t yi, xi

@@ -356,7 +356,7 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		%				alfa*v  =  A'*u  -  beta*v.
 		"""
 		tm = -time.time()
-		u = numexpr.evaluate("Amv-alfa*u", local_dict=dict(Amv=A.matvec(v), alfa=alfa, u=u))
+		u = numexpr.evaluate("Amv-alfa*u", local_dict=dict(Amv=A.matvec(v), alfa=alfa, u=u)).astype(u.dtype)
 		tm += time.time()
 		beta = np.linalg.norm(u)
 
@@ -364,7 +364,7 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 			u = (1/beta) * u
 			anorm = sqrt(anorm**2 + alfa**2 + beta**2 + damp**2)
 			trm = -time.time()
-			v = numexpr.evaluate("Aru-beta*v", local_dict=dict(Aru=A.rmatvec(u), beta=beta, v=v))
+			v = numexpr.evaluate("Aru-beta*v", local_dict=dict(Aru=A.rmatvec(u), beta=beta, v=v)).astype(u.dtype)
 			trm += time.time()
 			alfa = np.linalg.norm(v)
 			if alfa > 0:
