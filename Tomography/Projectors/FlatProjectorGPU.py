@@ -1,14 +1,12 @@
 import numpy
 import scipy.sparse
 
-import pyximport
-pyximport.install()
-
 from ..Kernels import Kernel
-from . import FlatProjector_cy as cy
+
+from reikna.cluda.api import Thread
 
 class FlatProjector(scipy.sparse.linalg.LinearOperator):
-	def __init__(self, kernel, shape = None):
+	def __init__(self, kernel, shape = None, thread=None):
 		
 		if isinstance(kernel, tuple) or isinstance(kernel, list):
 			if shape is not None:
@@ -40,20 +38,12 @@ class FlatProjector(scipy.sparse.linalg.LinearOperator):
 		else:
 			raise NotImplementedError
 
-	def matvec(self, v):
-		v = v.reshape(self.shape[1])
+		if isinstance(thread, Thread):
+			self.thread = thread
+		else:
+			if thread=='cuda':
+				self.thread = reikna.cluda.cuda_api().Thread.create()
+			else:
+				self.thread = reikna.ocl.cuda_api().Thread.create()
+
 		
-		u = numpy.zeros(self.shape[0], self.dtype)
-
-		cy.matvec(v, u, self.dat, self.idx[0], self.idx[1])
-
-		return u
-	
-	def rmatvec(self, v):
-		v = v.reshape(self.shape[0])
-		
-		u = numpy.zeros(self.shape[1], self.dtype)
-
-		cy.matvec(v, u, self.dat, self.idx[1], self.idx[0])
-
-		return u

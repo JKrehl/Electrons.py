@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division
-
 import numpy
 import numexpr
 from scipy import ndimage

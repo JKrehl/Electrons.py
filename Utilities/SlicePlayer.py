@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import numpy
 import matplotlib
+import matplotlib.image
  
 
 class SlicePlayer(matplotlib.image.AxesImage):
