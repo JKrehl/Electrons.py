@@ -56,7 +56,7 @@ class FlatProjectorPS(scipy.sparse.linalg.LinearOperator):
 		
 		u = numpy.zeros(self.shape[0], self.dtype)
 
-		cy.matvec(v, u, self.dat, self.idx[0], self.idx[1])
+		cy.matvec(v, u, self.c_dat, self.idx[0], self.idx[1])
 
 		return u
 	
