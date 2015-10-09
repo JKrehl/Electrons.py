@@ -6,10 +6,7 @@ import scipy.sparse
 import h5py
 import copy
 
-try:
-	import cPickle as pickle
-except ImportError:
-	import pickle
+import pickle
 
 import os.path
 import math

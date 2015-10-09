@@ -5,9 +5,9 @@ import pyximport
 pyximport.install()
 
 from ..Kernels import Kernel
-from . import FlatProjectorAlt_cy as cy
+from . import FlatProjectorPD_cy as cy
 
-class FlatProjectorPS(scipy.sparse.linalg.LinearOperator):
+class FlatProjectorPD(scipy.sparse.linalg.LinearOperator):
 	def __init__(self, kernel, shape = None):
 		
 		if isinstance(kernel, tuple) or isinstance(kernel, list):
@@ -35,19 +35,19 @@ class FlatProjectorPS(scipy.sparse.linalg.LinearOperator):
 			self.shape = kernel.fshape
 			dat = kernel.dat
 			idx = kernel.idx
-			self.nnz = self.dat.size
-			self.dtype = self.dat.dtype
+			self.nnz = dat.size
+			self.dtype = dat.dtype
 		else:
 			raise NotImplementedError
 
 		csort = numpy.argsort(idx[1])
 		self.c_idxr = idx[0][csort]
-		self.c_idxc = numpy.bincount(idx[1], min_length=self.shape[1])
+		self.c_idxc = numpy.hstack((0, numpy.cumsum(numpy.bincount(idx[1], minlength=self.shape[0])))).astype(idx[1].dtype)
 		self.c_dat = dat[csort]
 
 		rsort = numpy.argsort(idx[0])
 		self.r_idxc = idx[1][rsort]
-		self.r_idxr = numpy.bincount(idx[0], min_length=self.shape[0])
+		self.r_idxr = numpy.hstack((0, numpy.cumsum(numpy.bincount(idx[0], minlength=self.shape[1])))).astype(idx[0].dtype)
 		self.r_dat = dat[rsort]
 		
 
@@ -56,7 +56,7 @@ class FlatProjectorPS(scipy.sparse.linalg.LinearOperator):
 		
 		u = numpy.zeros(self.shape[0], self.dtype)
 
-		cy.matvec(v, u, self.c_dat, self.idx[0], self.idx[1])
+		cy.matvec(v, u, self.c_dat, self.c_idxc, self.c_idxr)
 
 		return u
 	
@@ -65,6 +65,6 @@ class FlatProjectorPS(scipy.sparse.linalg.LinearOperator):
 		
 		u = numpy.zeros(self.shape[1], self.dtype)
 
-		cy.matvec(v, u, self.dat, self.idx[1], self.idx[0])
+		cy.matvec(v, u, self.r_dat, self.r_idxr, self.r_idxc)
 
 		return u
