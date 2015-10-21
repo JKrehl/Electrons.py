@@ -9,11 +9,11 @@ class RayKernel(Kernel):
 	itype=numpy.int32
 	__arrays__ = ['dat','idx_te','idx_yx','z','y','x','t','e','mask']
 	
-	def __init__(self, y, x, t, d, mask=None, lazy=False):
+	def __init__(self, y, x, t, d, mask=None, lazy=False, symmetry=1):
 		self.__arrays__ = ['dat','idx_te','idx_yx','z','y','x','t','e','mask']
 		
 		y,x,t,d = (numpy.require(i) for i in (y,x,t,d))
-		self.__dict__.update(dict(y=y, x=x, t=t, d=d))
+		self.__dict__.update(dict(y=y, x=x, t=t, d=d, symmetry=symmetry))
 		self.shape = t.shape+d.shape+y.shape+x.shape
 		self.fshape = (t.size*d.size, y.size*x.size)
 
@@ -54,32 +54,33 @@ class RayKernel(Kernel):
 		idx = numpy.indices((self.d.size, self.y.size*self.x.size)).astype(self.itype)
 		
 		for it,ti in enumerate(self.t):
-			al = abs((ti+numpy.pi/4)%(numpy.pi/2) - numpy.pi/4)
-			a = .5*(numpy.cos(al)-numpy.sin(al))
-			b = .5*(numpy.cos(al)+numpy.sin(al))
-			h = 1/numpy.cos(al)
+			for tti in numpy.linspace(ti, ti+2*numpy.pi, self.symmetry):
+				al = abs((ti+numpy.pi/4)%(numpy.pi/2) - numpy.pi/4)
+				a = .5*(numpy.cos(al)-numpy.sin(al))
+				b = .5*(numpy.cos(al)+numpy.sin(al))
+				h = 1/numpy.cos(al)
 			
-			if b==a: f = 0
-			else: f = h/(b-a)
+				if b==a: f = 0
+				else: f = h/(b-a)
 			
-			e = numexpr.evaluate("x*cos(t)-y*sin(t) -d", local_dict=dict(x=x[None,None,:], y=y[None,:,None], d=d[:,None,None], t=ti)).reshape(d.size, y.size*x.size)
-			if self.mask is not None:
-				sel = numexpr.evaluate("mask&(abs(e)<(b+.5))", local_dict=dict(mask = self.mask[None,:], e=e, b=b))
-			else:
-				sel = numexpr.evaluate("(abs(e)<(b+.5))", local_dict=dict(e=e, b=b))
+				e = numexpr.evaluate("x*cos(t)-y*sin(t) -d", local_dict=dict(x=x[None,None,:], y=y[None,:,None], d=d[:,None,None], t=tti)).reshape(d.size, y.size*x.size)
+				if self.mask is not None:
+					sel = numexpr.evaluate("mask&(abs(e)<(b+.5))", local_dict=dict(mask = self.mask[None,:], e=e, b=b))
+				else:
+					sel = numexpr.evaluate("(abs(e)<(b+.5))", local_dict=dict(e=e, b=b))
 
-			e = e[sel]
-			sel = idx[:,sel]
+				e = e[sel]
+				sel = idx[:,sel]
 			
-			calcs = 'where({0}<-b, 0, where({0}<-a, .5*f*({0}+b)**2, where({0}<a, .5*f*(a-b)**2+h*({0}+a), where({0}<b, 1-.5*f*(b-{0})**2, 1))))'
-			ker = numexpr.evaluate('area*('+calcs.format('(dif+.5)')+'-'+calcs.format('(dif-.5)')+')', local_dict=dict(dif=e, a=a, b=b, f=f, h=h, area=unit_area))
+				calcs = 'where({0}<-b, 0, where({0}<-a, .5*f*({0}+b)**2, where({0}<a, .5*f*(a-b)**2+h*({0}+a), where({0}<b, 1-.5*f*(b-{0})**2, 1))))'
+				ker = numexpr.evaluate('area*('+calcs.format('(dif+.5)')+'-'+calcs.format('(dif-.5)')+')', local_dict=dict(dif=e, a=a, b=b, f=f, h=h, area=unit_area))
 			
-			csel = ker>=0#1e-2
-			sel = sel[:,csel]
+				csel = ker>=0#1e-2
+				sel = sel[:,csel]
 			
-			res[0].append(ker[csel])
-			res[1].append(sel[0,:]+self.d.size*it)
-			res[2].append(sel[1,:])
+				res[0].append(ker[csel])
+				res[1].append(sel[0,:]+self.d.size*it)
+				res[2].append(sel[1,:])
 
 			assert res[0][-1].size == res[1][-1].size
 

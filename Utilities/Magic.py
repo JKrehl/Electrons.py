@@ -1,4 +1,5 @@
-from __future__ import division, generators
+import pyximport
+pyximport.install()
 
 def lazy_property(fn):
 	decorated_name = '__'+fn.__name__
@@ -8,3 +9,5 @@ def lazy_property(fn):
 			setattr(self, decorated_name, fn(self))
 		return getattr(self, decorated_name)
 	return __lazy_property
+
+from .Magic_cy import *

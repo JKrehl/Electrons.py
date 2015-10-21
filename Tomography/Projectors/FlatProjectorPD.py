@@ -5,9 +5,9 @@ import pyximport
 pyximport.install()
 
 from ..Kernels import Kernel
-from . import FlatProjector_cy as cy
+from . import FlatProjectorPD_cy as cy
 
-class FlatProjector(scipy.sparse.linalg.LinearOperator):
+class FlatProjectorPD(scipy.sparse.linalg.LinearOperator):
 	def __init__(self, kernel, shape = None):
 		
 		if isinstance(kernel, tuple) or isinstance(kernel, list):
@@ -16,14 +16,14 @@ class FlatProjector(scipy.sparse.linalg.LinearOperator):
 			else:
 				raise AttributeError("The shape needs to be supplied to the Projector constructor")
 			
-			self.dat = kernel[0]
+			dat = kernel[0]
 			self.nnz = self.dat.size
 			self.dtype = self.dat.dtype
 			if len(kernel) == 2:
 				assert kernel[1].ndims==2 and kernel[1].shape[0]==2
-				self.idx = tuple(kernel[1])
+				idx = tuple(kernel[1])
 			elif len(kernel)==3:
-				self.idx = kernel[1:]
+				idx = kernel[1:]
 			else:
 				raise AttributeError
 		elif isinstance(kernel, Kernel):
@@ -33,22 +33,33 @@ class FlatProjector(scipy.sparse.linalg.LinearOperator):
 				kernel.calc()
 				
 			self.shape = kernel.fshape
-			self.dat = kernel.dat
-			self.idx = kernel.idx
-			self.nnz = self.dat.size
-			self.dtype = self.dat.dtype
+			dat = kernel.dat
+			idx = kernel.idx
+			self.nnz = dat.size
+			self.dtype = dat.dtype
 		else:
 			raise NotImplementedError
-		
+
+		csort = numpy.argsort(idx[1])
+		self.c_idxr = idx[0][csort]
+		self.c_idxc = numpy.hstack((0, numpy.cumsum(numpy.bincount(idx[1], minlength=self.shape[0])))).astype(idx[1].dtype)
+		self.c_dat = dat[csort]
+
+		rsort = numpy.argsort(idx[0])
+		self.r_idxc = idx[1][rsort]
+		self.r_idxr = numpy.hstack((0, numpy.cumsum(numpy.bincount(idx[0], minlength=self.shape[1])))).astype(idx[0].dtype)
+		self.r_dat = dat[rsort]
+
 		self.matvec = self._matvec
 		self.rmatvec = self._rmatvec
+		
 
 	def _matvec(self, v):
 		v = v.reshape(self.shape[1])
 		
 		u = numpy.zeros(self.shape[0], self.dtype)
 
-		cy.matvec(v, u, self.dat, self.idx[0], self.idx[1])
+		cy.matvec(v, u, self.c_dat, self.c_idxc, self.c_idxr)
 
 		return u
 	
@@ -57,6 +68,6 @@ class FlatProjector(scipy.sparse.linalg.LinearOperator):
 		
 		u = numpy.zeros(self.shape[1], self.dtype)
 
-		cy.matvec(v, u, self.dat, self.idx[1], self.idx[0])
+		cy.matvec(v, u, self.r_dat, self.r_idxr, self.r_idxc)
 
 		return u

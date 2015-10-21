@@ -1,15 +1,10 @@
-from __future__ import print_function
-
 import numpy
 import scipy.sparse
 
 import h5py
 import copy
 
-try:
-	import cPickle as pickle
-except ImportError:
-	import pickle
+import pickle
 
 import os.path
 import math

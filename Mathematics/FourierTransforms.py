@@ -37,11 +37,11 @@ def mwedge(ar, axis=None, axes=None):
 	axes = tuple(i%ar.ndim for i in axes)
 	lengths = tuple(ar.shape[i] for i in axes)
 	
-	ldict = {'f{:d}'.format(i):il//2/il*ishift(numpy.arange(-(il//2),(il+1)//2))[tuple(numpy.s_[:] if j==axes[i] else None for j in range(len(axes)))] for i, il in enumerate(lengths)}
+	ldict = {'f{:d}'.format(i):numpy.exp(1j*2*numpy.pi*(il//2/il*ishift(numpy.arange(-(il//2),(il+1)//2))))[tuple(numpy.s_[:] if j==axes[i] else None for j in range(ar.ndim))] for i, il in enumerate(lengths)}
 	ldict['ar'] = ar
 	ldict['pi'] = numpy.pi
 	
-	return numexpr.evaluate("ar*exp(1j*2*pi*({:s}))".format("".join('f{:d}+'.format(i) for i in range(len(axes)))[:-1]), local_dict=ldict)
+	return numexpr.evaluate("ar*{:s}".format("".join('f{:d}*'.format(i) for i in range(len(axes)))[:-1]), local_dict=ldict)
 
 def miwedge(ar, axis=None, axes=None):
 	if axis is not None:
@@ -52,11 +52,11 @@ def miwedge(ar, axis=None, axes=None):
 	axes = tuple(i%ar.ndim for i in axes)
 	lengths = tuple(ar.shape[i] for i in axes)
 	
-	ldict = {'f{:d}'.format(i):-(il//2)/il*ishift(numpy.arange(-(il//2),(il+1)//2))[tuple(numpy.s_[:] if j==axes[i] else None for j in range(len(axes)))] for i, il in enumerate(lengths)}
+	ldict = {'f{:d}'.format(i):numpy.exp(-1j*2*numpy.pi*(il//2)/il*ishift(numpy.arange(-(il//2),(il+1)//2)))[tuple(numpy.s_[:] if j==axes[i] else None for j in range(ar.ndim))] for i, il in enumerate(lengths)}
 	ldict['ar'] = ar
 	ldict['pi'] = numpy.pi
 	
-	return numexpr.evaluate("ar*exp(1j*2*pi*({:s}))".format("".join('f{:d}+'.format(i) for i in range(len(axes)))[:-1]), local_dict=ldict)
+	return numexpr.evaluate("ar*{:s}".format("".join('f{:d}*'.format(i) for i in range(len(axes)))[:-1]), local_dict=ldict)
 
 
 def mshift(ar, axis=None, axes=None):

@@ -29,7 +29,10 @@ class StackedExtendedProjector(scipy.sparse.linalg.LinearOperator):
 		
 		self.threads = threads
 		
-	def matvec(self, v):
+		self.matvec = self._matvec
+		self.rmatvec = self._rmatvec
+		
+	def _matvec(self, v):
 		v = v.reshape(self.shape[1])
 		
 		u = numpy.zeros(self.shape[0], self.dtype)
@@ -38,7 +41,7 @@ class StackedExtendedProjector(scipy.sparse.linalg.LinearOperator):
 
 		return u
 	
-	def rmatvec(self, v):
+	def _rmatvec(self, v):
 		v = v.reshape(self.shape[0])
 		
 		u = numpy.zeros(self.shape[1], self.dtype)
