@@ -399,11 +399,12 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		w = v + t2 * w
 		ddnorm = ddnorm + np.linalg.norm(dk)**2
 		
-		if interm_results and itn%interm_results==0:
-			if interm_results_sink is None:
-				ires.append(x.copy())
-			else:
-				interm_results_sink(itn, x)
+		if interm_results is not None:
+			if (hasattr(interm_results, '__iter__') and itn in interm_results) or (not hasattr(interm_results, '__iter__') and itn%interm_results==0):
+				if interm_results_sink is not None:
+					interm_results_sink(itn, x)
+				else:
+					ires.append(x.copy())
 		
 		if calc_var:
 			var = var + dk**2
@@ -521,7 +522,7 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		print(str3 + '   ' + str4)
 		print(' ')
 		
-	if interm_results and interm_results_sink is None:
+	if interm_results is not None and interm_results_sink is None:
 		return x, ires, istop, itn, r1norm, r2norm, anorm, acond, arnorm, xnorm, var
 	else:
 		return x, istop, itn, r1norm, r2norm, anorm, acond, arnorm, xnorm, var

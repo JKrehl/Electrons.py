@@ -100,14 +100,17 @@ class FlatProjectorGPU(scipy.sparse.linalg.LinearOperator):
 		self.gpu_matvec = GPU_matvec(self.c_arr, self.r_arr, self.c_dat, self.c_idxc, self.c_idxr).compile(self.thread)
 		self.gpu_rmatvec = GPU_matvec(self.r_arr, self.c_arr, self.r_dat, self.r_idxr, self.r_idxc).compile(self.thread)
 		
-	def matvec(self, v):
+		self.matvec = self._matvec
+		self.rmatvec = self._rmatvec
+		
+	def _matvec(self, v):
 		self.thread.to_device(v.reshape(self.shape[1]), self.c_arr)
 
 		self.gpu_matvec(self.c_arr, self.r_arr, self.c_dat, self.c_idxc, self.c_idxr)
 
 		return self.r_arr.get()
 	
-	def rmatvec(self, v):
+	def _rmatvec(self, v):
 		self.thread.to_device(v.reshape(self.shape[0]), self.r_arr)
 
 		self.gpu_rmatvec(self.r_arr, self.c_arr, self.r_dat, self.r_idxr, self.r_idxc)

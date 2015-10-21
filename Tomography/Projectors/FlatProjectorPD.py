@@ -49,9 +49,12 @@ class FlatProjectorPD(scipy.sparse.linalg.LinearOperator):
 		self.r_idxc = idx[1][rsort]
 		self.r_idxr = numpy.hstack((0, numpy.cumsum(numpy.bincount(idx[0], minlength=self.shape[1])))).astype(idx[0].dtype)
 		self.r_dat = dat[rsort]
+
+		self.matvec = self._matvec
+		self.rmatvec = self._rmatvec
 		
 
-	def matvec(self, v):
+	def _matvec(self, v):
 		v = v.reshape(self.shape[1])
 		
 		u = numpy.zeros(self.shape[0], self.dtype)
@@ -60,7 +63,7 @@ class FlatProjectorPD(scipy.sparse.linalg.LinearOperator):
 
 		return u
 	
-	def rmatvec(self, v):
+	def _rmatvec(self, v):
 		v = v.reshape(self.shape[0])
 		
 		u = numpy.zeros(self.shape[1], self.dtype)

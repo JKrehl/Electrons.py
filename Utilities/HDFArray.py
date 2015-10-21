@@ -6,36 +6,33 @@ import tempfile
 import h5py
 import operator
 import functools
+import contextlib
 
 class HDFConcatenator:
 	def __init__(self, dtype=None):
 		self.dtype = dtype
 		
 		self.tfile = tempfile.NamedTemporaryFile(dir=os.path.expanduser("~/tmp"))
-		self.hfile = h5py.File(self.tfile.name, 'r+')
-		self.i = 0
+		self.initialised = False
 
-	def append(self, arr, dtype=None):
-		arr = numpy.require(arr)
-		if self.dtype is None:
-			if dtype is None:
-				dtype = arr.dtype
-		self.hfile.create_dataset(str(self.i), data=arr, dtype=self.dtype)
-		self.i += 1
+		self.sizes = []
 
-	@property
-	def sizes(self):
-		return [functools.reduce(operator.mul, self.hfile[str(i)].shape) for i in range(self.i)]
-	
-	def concatenate(self):
-		size = (functools.reduce(operator.add, [functools.reduce(operator.mul, i.shape) for i in self.hfile.values()]),)
-		arr = numpy.empty(size, self.dtype)
+	def append(self, arr):
+		self.sizes.append(arr.size)
+		
+		if not self.initialised:
+			if self.dtype is None:
+				self.dtype = arr.dtype
+			with h5py.File(self.tfile.name, 'r+') as hfile:
+					hfile.create_dataset('array', data=arr.astype(self.dtype, copy=False), maxshape=(None,)+arr.shape[1:], chunks=True)
+			self.initialised = True
+		else:
+			if arr.size!=0:
+				with h5py.File(self.tfile.name, 'r+') as hfile:
+					hfile['array'].resize(hfile['array'].shape[0]+arr.shape[0], axis=0)
+					hfile['array'][-arr.shape[0]:, ...] = arr.astype(self.dtype, copy=False)
 
-		lb = 0
-		for i in range(self.i):
-			isize = functools.reduce(operator.mul, self.hfile[str(i)].shape)
-			if isize>0:
-				self.hfile[str(i)].read_direct(arr, dest_sel=numpy.s_[lb:lb+isize])
-				lb += isize
-
-		return arr
+	@contextlib.contextmanager
+	def array(self):
+		with h5py.File(self.tfile.name, 'r+') as hfile:
+			yield hfile['array']

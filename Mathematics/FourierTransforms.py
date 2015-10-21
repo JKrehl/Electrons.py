@@ -56,7 +56,7 @@ def miwedge(ar, axis=None, axes=None):
 	ldict['ar'] = ar
 	ldict['pi'] = numpy.pi
 	
-	return numexpr.evaluate("ar*{:s})".format("".join('f{:d}*'.format(i) for i in range(len(axes)))[:-1]), local_dict=ldict)
+	return numexpr.evaluate("ar*{:s}".format("".join('f{:d}*'.format(i) for i in range(len(axes)))[:-1]), local_dict=ldict)
 
 
 def mshift(ar, axis=None, axes=None):

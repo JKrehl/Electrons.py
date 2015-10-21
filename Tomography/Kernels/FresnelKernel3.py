@@ -1,4 +1,4 @@
-from __future__ import division, print_function, absolute_import 
+from __future__ import division, absolute_import 
 
 import numpy
 import numexpr
@@ -15,24 +15,29 @@ from ...Utilities import HDFArray as HA
 from ...Mathematics import FourierTransforms as FT
 from ...Mathematics import Interpolator2D
 
+import gc
+
 from .Base import Kernel
 
 def supersample(points, size, factor):
-	return numpy.add.outer(numpy.require(points), numpy.linspace(-size/2,size/2, factor, False))
+	return numpy.add.outer(numpy.require(points), numpy.linspace(-size/2, size/2, factor, False))
 
 def create_convolution_kernel(trafo, h, w):
-	size = 2*numpy.ceil(.71*max(h, w))+1
-	window = numpy.ones((h,w))/(h*w)
+	ss = 32
+	size = ss*(2*numpy.ceil(.71*max(h, w))+1)
+	window = numpy.ones((ss*h,ss*w))/(h*w)
 
-	trafo = trafo.copy()
-	trafo.postshift([size/2, size/2])
-	trafo.preshift([-h/2, -w/2])
+	trafoc = trafo.copy()
+	trafoc.postshift([ss*h/2-.5, ss*w/2-.5])
+	trafoc.preshift([-size/2+.5, -size/2+.5])
 
-	window = scipy.ndimage.interpolation.affine_transform(window, trafo.affine, offset=trafo.offset, output_shape=(size, size), order=1)
+	window = scipy.ndimage.interpolation.affine_transform(window, trafoc.affine, offset=trafoc.offset, output_shape=(size, size), order=1)
 
+	window = window.reshape(size//ss, ss, size//ss, ss).mean((1,3))
+	
 	while numpy.all(window[(0,-1),:]==0): window = window[1:-1, :]
 	while numpy.all(window[:,(0,-1)]==0): window = window[:, 1:-1]
-
+	
 	return window
 
 class FresnelKernel3(Kernel):
@@ -41,11 +46,11 @@ class FresnelKernel3(Kernel):
 	itype=numpy.int32
 
 	def __init__(self, z,y,x,t,d, k, focus=0, bandlimit=0,  mask=None):
-		self.__arrays__ = ['dat','idx_te','idx_yx','bounds','z','y','x','t','d','focus','mask']
+		self.__arrays__ = ['dat','idx_td','idx_yx','idz','bounds','z','y','x','t','d','focus','mask']
 
 		self.__dict__.update(dict(z=z, y=y, x=x, t=t, d=d, k=k, bandlimit=bandlimit, focus=focus))
 
-		if not isinstance(self.focus, numpy.ndarray):
+		if not isinstance(self.focus, numpy.ndarray) or self.focus.size==1:
 			self.focus = self.focus*numpy.ones(self.t.shape, numpy.obj2sctype(self.focus))
 		
 		if mask:
@@ -71,7 +76,7 @@ class FresnelKernel3(Kernel):
 		
 		ss_v = 4
 		ss_u = 4
-		cutoff = 1e-2
+		cutoff = 5e-2
 		
 		vus = []
 		kernels = []
@@ -88,13 +93,12 @@ class FresnelKernel3(Kernel):
 			vus.append((v,u))
 
 			kern = create_convolution_kernel(trafo, ss_v, ss_u)
-			kern = kern.reshape((1,)+kern.shape)
 			kernels.append(kern)
 
 		v_amax = max(-v_min, v_max)
 		rho_max = -v_amax*self.bandlimit/dv+numpy.sqrt((v_amax*self.bandlimit/dv)**2+6*numpy.pi*2*v_amax**2/(self.k*dv))
 		
-		w_i = numpy.arange(-numpy.ceil(rho_max/dw), numpy.ceil(rho_max/dw))
+		w_i = numpy.arange(-numpy.ceil(rho_max/dw), numpy.ceil(rho_max/dw), dtype=self.itype)
 		w = dw*w_i
 		v = dv*numpy.arange(numpy.floor(v_min/dv), numpy.ceil(v_max/dv))
 		u = du*numpy.arange(-numpy.ceil(rho_max/du), numpy.ceil(rho_max/du))
@@ -112,24 +116,29 @@ class FresnelKernel3(Kernel):
 		res_win = numexpr.evaluate("where(kr==0, 1, 2*j1kr/kr)", local_dict=dict(kr=kr, j1kr=scipy.special.j1(kr)))
 		
 		propf = numexpr.evaluate("propf*res_win", local_dict=dict(propf=propf, res_win=res_win[:,None,:]))
-		prop = FT.ifft(propf, axes=(0,2))
 
+		prop = numpy.empty_like(propf)
+		for i in range(prop.shape[1]):
+			prop[:,i,:] = FT.ifft(propf[:,i,:])
+		
 		del propf
 		
 		prop_max = numpy.amax(numpy.abs(prop))
-		prop_ez = prop < cutoff*prop_max
+		prop_nz = numpy.abs(prop) >= cutoff*prop_max
 
-		prop_shrink = numpy.array([[Magic.where_first_not(a), Magic.where_last_not(a)] for a in (numpy.all(prop_ez, axis=(1,2)), numpy.all(prop_ez, axis=(0,1)))])
+		prop_shrink = numpy.array([[Magic.where_first(a), Magic.where_last(a)+1] for a in (numpy.any(prop_nz, axis=(1,2)), numpy.any(prop_nz, axis=(0,1)))])
 		prop_shrink[0] += [-1,+1]
 		prop_shrink[1] += [-ss_u, +ss_u]
-		prop_shrink[prop_shrink<0] = 0
+		
+		if prop_shrink[0,0] < 0: prop_shrink[0,0] = 0
+		if prop_shrink[0,1] > prop_nz.shape[0]: prop_shrink[0,1] = prop_nz.shape[0]
+		if prop_shrink[1,0] < 0: prop_shrink[1,0] = 0
+		if prop_shrink[1,1] > prop_nz.shape[2]: prop_shrink[1,1] = prop_nz.shape[2]
 		
 		prop = numpy.require(prop[prop_shrink[0,0]:prop_shrink[0,1], :, prop_shrink[1,0]:prop_shrink[1,1]], None, 'O')
 		w_i_sh = w_i[prop_shrink[0,0]:prop_shrink[0,1]]
 		w_sh = w[prop_shrink[0,0]:prop_shrink[0,1]]
 		u_ss_sh = u_ss[prop_shrink[1,0]:prop_shrink[1,1]]
-
-		return prop
 		
 		del kr, res_win
 		
@@ -149,7 +158,6 @@ class FresnelKernel3(Kernel):
 		
 		for iz, zi in Progress(enumerate(w_i_sh), w_i_sh.size, True):
 			
-
 			idat_z = [numpy.ndarray(0, self.dtype)]
 			itd_z = [numpy.ndarray(0, self.itype)]
 			iyx_z = [numpy.ndarray(0, self.itype)]
@@ -158,43 +166,60 @@ class FresnelKernel3(Kernel):
 				v,u = vus[it]
 				kern = kernels[it]
 				
-				propi = scipy.ndimage.filters.convolve(propf.real, kern, mode='constant') + 1j*scipy.ndimage.filters.convolve(propf.imag, kern, mode='constant')
-				shrinki = [Magic.where_first(numpy.all(propi_nz[iz, :, :], axis=1)), Magic.where_last(numpy.all(propi_nz[iz, :, :], axis=1))+1]
+				propi = scipy.ndimage.filters.convolve(prop[iz,:,:].real, kern, origin=-numpy.array(kern.shape)/2, mode='constant') + \
+						1j*scipy.ndimage.filters.convolve(prop[iz,:,:].imag, kern, origin=-numpy.array(kern.shape)/2, mode='constant')
+				propi_nz = numpy.abs(propi) >= cutoff*prop_max
 
-				interpi = lambda x: scipy.interpolate.interpn((v_ss, u_ss_sh[shrinki[0]:shrinki[1]]), propi[iz, :, shrinki[0]:shrinki[1]], x, method='linear', bounds_error=False, fill_value=0)
-
-				dif_max = max(-u_ss_sh[shrinki[0]], u_ss_sh[shrinki[1]])
-				sel = numexpr.evaluate("abs(u-d)<=dif_max", local_dict=dict(u=u[yx_idx], d=d[d_idx], dif_max=dif_max))
+				if numpy.any(propi_nz):
+					shrinki = [Magic.where_first(numpy.any(propi_nz, axis=0)), Magic.where_last(numpy.any(propi_nz, axis=0))+1]
+					interpi = scipy.interpolate.RegularGridInterpolator((v_ss, u_ss_sh[shrinki[0]:shrinki[1]]), propi[:, shrinki[0]:shrinki[1]], method='linear', bounds_error=False, fill_value=None)
+					
+					diff_max = max(-u_ss_sh[shrinki[0]], -u_ss_sh[shrinki[1]-1])
+					diff = numexpr.evaluate("u-d", local_dict=dict(u=u[yx_idx], d=self.d[d_idx]))
+					sel = numexpr.evaluate("abs(diff)<=diff_max", local_dict=dict(diff=diff, diff_max=diff_max))
 				
-				if numpy.count_nonzero(sel)>0:
-					d_sel = d_idx[sel]
-					yx_sel = yx_idx[sel]
+					if numpy.any(sel):
+						d_sel = d_idx[sel]
+						yx_sel = yx_idx[sel]
+						diff = diff[sel]
+						
+						dat = interpi(numpy.vstack((v[yx_sel], diff)).T)
+						
+						psel = numpy.abs(dat) >= cutoff*prop_max
+						
+						idat_z.append(numpy.require(dat[psel], requirements='O'))
+						itd_z.append(numpy.require(it*self.d.size+d_sel[psel], requirements='O'))
+						iyx_z.append(numpy.require(yx_sel[psel], requirements='O'))
 
-					dat = interpi(numpy.hstack((v[yx_sel], numexpr.evaluate("u-d", local_dict=dict(u=u[yx_sel], d=self.d[d_sel])))))
+						del d_sel, yx_sel, dat, psel
 
-					psel = dat >= cutoff*prop_max
+					del shrinki, interpi, diff, sel
 
-					idat_z.append(numpy.require(dat[psel], requirements='O'))
-					itd_z.append(numpy.require(it*self.d.size+d_sel[psel], requirements='O'))
-					iyx_z.append(numpy.require(yx_sel[psel], requirements='O'))
+				del propi, propi_nz
+				del v,u, kern
 
-				dat_z.append(numpy.concatenate(idat_z))
-				del idat_z
-				td_z.append(numpy.concatenate(itd_z))
-				del itd_z
-				yx_z.append(numpy.concatenate(iyx_z))
-				del iyx_z
-
-			del propi, sel, dat, psel, d_sel, yx_sel, d_idx, yx_idx, v_u
-
-			self.bounds = [0]+dat_z.sizes
-			self.bounds = numpy.cumsum(self.bounds).astype(self.itype)
-
-			self.dat = dat_z.concatenate()
-			self.idx_td = td_z.concatenate()
-			self.idx_yx = yx_z.concatenate()
+			dat_z.append(numpy.concatenate(idat_z))
+			td_z.append(numpy.concatenate(itd_z))
+			yx_z.append(numpy.concatenate(iyx_z))
+			del idat_z, itd_z, iyx_z
 			
-			return (self.dat, self.idx_td, self.idx_yx, self.bounds)
+		del prop, yx_idx, d_idx
+
+		gc.collect()
+		
+		self.bounds = [0]+dat_z.sizes
+		self.bounds = numpy.cumsum(self.bounds).astype(self.itype)
+
+		self.idz = w_i_sh
+
+		with dat_z.array() as array:
+			self.dat = numpy.require(array, None, 'O')
+		with td_z.array() as array:
+			self.idx_td = numpy.require(array, None, 'O')
+		with yx_z.array() as array:
+			self.idx_yx = numpy.require(array, None, 'O')
+			
+		return (self.dat, self.idx_td, self.idx_yx, self.idz, self.bounds)
 		
 	@property
 	def idx(self):
