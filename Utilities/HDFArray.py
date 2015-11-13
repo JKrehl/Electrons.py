@@ -31,8 +31,18 @@ class HDFConcatenator:
 				with h5py.File(self.tfile.name, 'r+') as hfile:
 					hfile['array'].resize(hfile['array'].shape[0]+arr.shape[0], axis=0)
 					hfile['array'][-arr.shape[0]:, ...] = arr.astype(self.dtype, copy=False)
+					
+	#@contextlib.contextmanager
+	#def array(self):
+	#	with h5py.File(self.tfile.name, 'r+') as hfile:
+	#		yield hfile['array']
 
-	@contextlib.contextmanager
-	def array(self):
+	def get_array(self):
 		with h5py.File(self.tfile.name, 'r+') as hfile:
-			yield hfile['array']
+			ar = numpy.empty(hfile['array'].shape, hfile['array'].dtype)
+			hfile['array'].read_direct(ar)
+		return ar
+
+	@property
+	def size(self):
+		return os.path.getsize(self.tfile.name)

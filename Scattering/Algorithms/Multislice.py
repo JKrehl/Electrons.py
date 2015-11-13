@@ -62,10 +62,12 @@ class Multislice:
 		self.opchain.impose_zorder()
 		
 		self.prepared = True
+
+		return self
 		
 	def run(self, wave=None, progress=False):
 		if wave is None:
-			wave = numpy.ones(self.x.shape+self.y.shape, dtype=numpy.complex)
+			wave = numpy.ones(self.y.shape+self.x.shape, dtype=numpy.complex)
 	
 		if not self.prepared:
 			self.prepare()

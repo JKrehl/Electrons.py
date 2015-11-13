@@ -346,6 +346,8 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		str3 = '  %8.1e %8.1e' % (test1, test2)
 		print(str1, str2, str3)
 
+	ires = []
+
 	# Main iteration loop.
 	while itn < iter_lim:
 		itn = itn + 1

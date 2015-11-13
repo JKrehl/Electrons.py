@@ -1,28 +1,14 @@
 #cython: boundscheck=False, initializedcheck=False, wraparound=False
 
-import numpy
 cimport numpy
 cimport cython
-from cython.parallel import parallel, prange
+from cython.parallel cimport parallel, prange
 cimport openmp
 
-ctypedef fused idx_t:
-	numpy.int32_t
-	numpy.int64_t
-	numpy.uint32_t
-	numpy.int_t
+numpy.import_array()
 
-ctypedef fused dat_t:
-	numpy.float32_t
-	numpy.float64_t
-	numpy.float_t
-	numpy.int16_t
-	numpy.int32_t
-	numpy.int64_t
+from Projector_Utilities cimport idx_t, dat_t, atomic_add
 
-cdef extern from "atomic_add.hpp":
-	inline void atomic_add[T](T*, T) nogil
-	
 def matvec(
 		dat_t[:] vec,
 		dat_t[:] res,
@@ -32,8 +18,8 @@ def matvec(
 		int threads = 0,
 		):
 
-	cdef idx_t tensor_length = dat.size
-	cdef idx_t i
+	cdef numpy.npy_intp tensor_length = dat.size
+	cdef numpy.npy_intp i
 	cdef dat_t tmp
 
 	if threads==0:
@@ -41,7 +27,6 @@ def matvec(
 	
 	with nogil, parallel(num_threads=threads):
 		for i in prange(tensor_length, schedule='guided'):
-			#res[row[i]] += dat[i]*vec[col[i]]
 			tmp = dat[i]*vec[row[i]]
 			atomic_add(&res[col[i]], tmp)
 

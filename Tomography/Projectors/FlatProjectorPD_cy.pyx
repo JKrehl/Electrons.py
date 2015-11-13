@@ -1,24 +1,13 @@
 #cython: boundscheck=False, initializedcheck=False, wraparound=False
 
-import numpy
 cimport numpy
 cimport cython
-from cython.parallel import parallel, prange
+from cython.parallel cimport parallel, prange
 cimport openmp
 
-ctypedef fused idx_t:
-	numpy.int32_t
-	numpy.int64_t
-	numpy.uint32_t
-	numpy.int_t
+numpy.import_array()
 
-ctypedef fused dat_t:
-	numpy.float32_t
-	numpy.float64_t
-	numpy.float_t
-	numpy.int16_t
-	numpy.int32_t
-	numpy.int64_t
+from Projector_Utilities cimport idx_t, dat_t
 
 def matvec(
 		dat_t[:] vec,
@@ -29,8 +18,8 @@ def matvec(
 		int threads = 0,
 		):
 
-	cdef idx_t length = bounds.size-1 
-	cdef idx_t i,j
+	cdef numpy.npy_intp length = bounds.size-1 
+	cdef numpy.npy_intp i,j
 	cdef dat_t tmp
 
 	if threads==0:

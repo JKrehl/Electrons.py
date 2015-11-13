@@ -37,7 +37,7 @@ class StackedExtendedProjector(scipy.sparse.linalg.LinearOperator):
 		
 		u = numpy.zeros(self.shape[0], self.dtype)
 
-		cy.matvec(v,u, self.dat, self.idz, self.bounds, self.idx[1], self.idx[0], self.z.size, self.threads)
+		cy.matvec(v,u, self.z.size, self.idz, self.bounds, self.idx[1], self.idx[0], self.dat, self.threads)
 
 		return u
 	
@@ -45,7 +45,7 @@ class StackedExtendedProjector(scipy.sparse.linalg.LinearOperator):
 		v = v.reshape(self.shape[0])
 		
 		u = numpy.zeros(self.shape[1], self.dtype)
-
-		cy.matvec(v,u, self.dat, self.idz, self.bounds, self.idx[0], self.idx[1], self.z.size, self.threads)
+		
+		cy.matvec(v,u, self.z.size, -self.idz, self.bounds, self.idx[0], self.idx[1], self.dat, self.threads)
 
 		return u

@@ -12,16 +12,16 @@ from ..Base import PlaneOperator
 
 class FlatAtomDW_ROI(PlaneOperator):
 	def __init__(self, atoms, roi=None,
-				 roi_x=None, roi_y=None,
-				 roi_kx=None, roi_ky=None, roi_kk=None,
+				 roi_y=None, roi_x=None,
+				 roi_ky=None, roi_kx=None, roi_kk=None,
 				 phaseshifts_f=None,
 				 ky=None, kx=None, kk=None,
 				 atom_potential_generator=WeickenmeierKohl, energy=None, y=None, x=None,
 				 dtype=numpy.complex,
 				 lazy=True, forgetful=True):
 		self.__dict__.update(dict(atoms=atoms,
-								  roi=roi, roi_x=roi_x, roi_y=roi_y,
-								  roi_kx=roi_kx, roi_ky=roi_ky, roi_kk=roi_kk,
+								  roi=roi, roi_y=roi_y, roi_x=roi_x,
+								  roi_ky=roi_ky, roi_kx=roi_kx, roi_kk=roi_kk,
 								  phaseshifts_f=phaseshifts_f,
 								  ky=ky, kx=kx, kk=kk,
 								  atom_potential_generator=atom_potential_generator, energy=energy, y=y, x=x,
@@ -132,7 +132,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 			roi_kk = numpy.add.outer(roi_ky**2, roi_kx**2)
 		else:
 			roi_kk = self.roi_kk
-		
+			
 		if self.phaseshifts_f is None:
 			self.phaseshifts_f = {i: self.atom_potential_generator.phaseshift_f(i, self.energy, roi_y, roi_x) for i in numpy.unique(self.atoms['Z'])}
 		
