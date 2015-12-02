@@ -32,9 +32,9 @@ class SlicePlayer(matplotlib.image.AxesImage):
         #    im.set_clim(vmin, vmax)
         if vmin is not None or vmax is not None:
             self.set_clim(vmin, vmax)
-        else:
+        #else:
             #self.autoscale_None()
-            self.set_clim(numpy.amin(self.arr), numpy.amax(self.arr))
+            #self.set_clim(numpy.amin(self.arr), numpy.amax(self.arr))
         self.set_url(url)
 
         self.set_extent(self.get_extent())

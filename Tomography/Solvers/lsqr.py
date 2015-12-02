@@ -400,8 +400,8 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		x = x + t1 * w
 		w = v + t2 * w
 		ddnorm = ddnorm + np.linalg.norm(dk)**2
-		
-		if interm_results is not None:
+
+		if interm_results is not None and interm_results:
 			if (hasattr(interm_results, '__iter__') and itn in interm_results) or (not hasattr(interm_results, '__iter__') and itn%interm_results==0):
 				if interm_results_sink is not None:
 					interm_results_sink(itn, x)

@@ -5,15 +5,13 @@ from .Base import Kernel
 
 class RayKernel(Kernel):
 	ndims = 2
-	dtype=numpy.float64
-	itype=numpy.int32
 	__arrays__ = ['dat','idx_te','idx_yx','z','y','x','t','e','mask']
 	
-	def __init__(self, y, x, t, d, mask=None, lazy=False, symmetry=1):
+	def __init__(self, y, x, t, d, mask=None, lazy=False, symmetry=1, dtype=numpy.float64, itype=numpy.int32):
 		self.__arrays__ = ['dat','idx_te','idx_yx','z','y','x','t','e','mask']
 		
 		y,x,t,d = (numpy.require(i) for i in (y,x,t,d))
-		self.__dict__.update(dict(y=y, x=x, t=t, d=d, symmetry=symmetry))
+		self.__dict__.update(dict(y=y, x=x, t=t, d=d, symmetry=symmetry, dtype=dtype, itype=itype))
 		self.shape = t.shape+d.shape+y.shape+x.shape
 		self.fshape = (t.size*d.size, y.size*x.size)
 
@@ -84,9 +82,9 @@ class RayKernel(Kernel):
 
 			assert res[0][-1].size == res[1][-1].size
 
-		self.dat = numpy.hstack(res[0])
-		self.idx_te = numpy.hstack(res[2])
-		self.idx_yx = numpy.hstack(res[1])
+		self.dat = numpy.hstack(res[0]).astype(self.dtype)
+		self.idx_te = numpy.hstack(res[2]).astype(self.itype)
+		self.idx_yx = numpy.hstack(res[1]).astype(self.itype)
 			
 		self.status = 0
 

@@ -56,7 +56,7 @@ class AtomicObject:
 	def transform(self, trafo):
 		atoms = self.atoms.copy()
 		atoms['zyx'] = trafo*atoms['zyx']
-					
+		
 		return self.__class__(atoms=atoms)
 
 	def zsort(self):

@@ -155,7 +155,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 											   'ys':dy*rpy, 'xs':dx*rpx,
 											   'ky':roi_ky[:,None], 'kx':roi_kx[None,:],
 											   'kk':roi_kk, 'B':a['B']})
-			
+
 			tf[select] *= numpy.exp(1j*FT.ifft(itf))[iselect]
 		self.transfer_function =tf
 
