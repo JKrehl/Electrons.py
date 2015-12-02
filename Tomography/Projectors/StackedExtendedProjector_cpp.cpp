@@ -84,7 +84,7 @@ void sparse_matvec_template(PyArrayObject* inp, PyArrayObject* outp, npy_intp zs
 							#pragma omp simd
 							for(i=0; i<loopsize; i++)
 							{
-								atomic_add(outp_loc + loop_row[0], (DTYPE) 1);//loop_coeff[0] * inp_loc[loop_col[0]]);
+								atomic_add(outp_loc + loop_row[0], loop_coeff[0] * inp_loc[loop_col[0]]);
 					
 								loop_col += loop_col_stride;
 								loop_row += loop_row_stride;
