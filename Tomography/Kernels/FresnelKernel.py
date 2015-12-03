@@ -183,9 +183,9 @@ class FresnelKernel(Kernel):
 
 		gc.collect()
 		
-		self.bounds = [0]+dat_z.sizes
+		self.bounds = numpy.array(dat_z.sizes)
 		sel = self.bounds > 0
-		self.bounds = numpy.cumsum(self.bounds[sel]).astype(self.itype)
+		self.bounds = numpy.cumsum(numpy.hstack((0, self.bounds[sel]))).astype(self.itype)
 
 		self.idz = w_i_sh[sel]
 		
