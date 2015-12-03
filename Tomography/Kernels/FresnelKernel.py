@@ -184,9 +184,10 @@ class FresnelKernel(Kernel):
 		gc.collect()
 		
 		self.bounds = [0]+dat_z.sizes
-		self.bounds = numpy.cumsum(self.bounds).astype(self.itype)
+		sel = self.bounds > 0
+		self.bounds = numpy.cumsum(self.bounds[sel]).astype(self.itype)
 
-		self.idz = w_i_sh
+		self.idz = w_i_sh[sel]
 		
 		print('data array size: %f %s' % Magic.humanize_filesize(dat_z.size))
 		print('td indices array size: %f %s' % Magic.humanize_filesize(td_z.size))

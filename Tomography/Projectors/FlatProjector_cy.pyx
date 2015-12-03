@@ -7,20 +7,20 @@ cimport openmp
 
 numpy.import_array()
 
-from Projector_Utilities cimport idx_t, dat_t, atomic_add
+from Projector_Utilities cimport itype, dtype, atomic_add
 
 def matvec(
-		dat_t[:] vec,
-		dat_t[:] res,
-		dat_t[:] dat,
-		idx_t[:] row,
-		idx_t[:] col,
+		dtype[:] vec,
+		dtype[:] res,
+		dtype[:] dat,
+		itype[:] row,
+		itype[:] col,
 		int threads = 0,
 		):
 
 	cdef numpy.npy_intp tensor_length = dat.size
 	cdef numpy.npy_intp i
-	cdef dat_t tmp
+	cdef dtype tmp
 
 	if threads==0:
 		threads = openmp.omp_get_max_threads()

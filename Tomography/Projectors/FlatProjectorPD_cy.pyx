@@ -7,20 +7,20 @@ cimport openmp
 
 numpy.import_array()
 
-from Projector_Utilities cimport idx_t, dat_t
+from Projector_Utilities cimport itype, dtype
 
 def matvec(
-		dat_t[:] vec,
-		dat_t[:] res,
-		dat_t[:] dat,
-		idx_t[:] bounds,
-		idx_t[:] idx,
+		dtype[:] vec,
+		dtype[:] res,
+		dtype[:] dat,
+		itype[:] bounds,
+		itype[:] idx,
 		int threads = 0,
 		):
 
 	cdef numpy.npy_intp length = bounds.size-1 
 	cdef numpy.npy_intp i,j
-	cdef dat_t tmp
+	cdef dtype tmp
 
 	if threads==0:
 		threads = openmp.omp_get_max_threads()

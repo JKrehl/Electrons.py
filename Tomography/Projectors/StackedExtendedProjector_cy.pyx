@@ -1,13 +1,16 @@
-#cython: boundscheck=False, initializedcheck=False, wraparound=False, initializedcheck=False
+#cython: boundscheck=False, initializedcheck=False, wraparound=False
 
 import numpy
 cimport numpy, cython
 from cython.parallel import parallel, prange
 cimport openmp
 
+#distutils: include_dirs = /home/krehl/Python/Electrons/Tomography/Projectors/
+#distutils: include_dirs = numpy.get_include()
+
 numpy.import_array()
 
-from Projector_Utilities cimport idx_t, dat_t, atomic_add
+from Projector_Utilities cimport itype, dtype, atomic_add
 
 cdef extern from "StackedExtendedProjector_cpp.cpp" nogil:
 	void sparse_matvec(numpy.ndarray inp, numpy.ndarray outp, numpy.npy_intp zsize, numpy.ndarray dz, numpy.ndarray bounds, numpy.ndarray col, numpy.ndarray row, numpy.ndarray coeff, int threads)
@@ -38,27 +41,27 @@ def matvec(
 	sparse_matvec(vec, res, zsize, dz, bounds, col, row, coeff, threads)
 
 def matvec2(
-		dat_t[:] vec,
-		dat_t[:] res,
+		dtype[:] vec,
+		dtype[:] res,
 		numpy.npy_intp zsize,
-		idx_t[:] idz,
-		idx_t[:] bounds,
-		idx_t[:] idx_col,
-		idx_t[:] idx_row,
-		dat_t[:] coeff,
+		itype[:] idz,
+		itype[:] bounds,
+		itype[:] idx_col,
+		itype[:] idx_row,
+		dtype[:] coeff,
 		int threads=0):
 	
-	cdef idx_t col_stride = numpy.round(vec.size/zsize)
-	cdef idx_t row_stride = numpy.round(res.size/zsize)
-	cdef idx_t i,j,k
+	cdef itype col_stride = numpy.round(vec.size/zsize)
+	cdef itype row_stride = numpy.round(res.size/zsize)
+	cdef itype i,j,k
 
-	cdef idx_t idzlen = len(idz)
+	cdef itype idzlen = len(idz)
 
-	cdef dat_t* vec_view
-	cdef dat_t* res_view
-	cdef dat_t* coeff_view
-	cdef idx_t* idx_col_view
-	cdef idx_t* idx_row_view
+	cdef dtype* vec_view
+	cdef dtype* res_view
+	cdef dtype* coeff_view
+	cdef itype* idx_col_view
+	cdef itype* idx_row_view
 	
 	if threads==0:
 		threads = openmp.omp_get_max_threads()

@@ -5,36 +5,24 @@ cimport numpy, cython
 from cython.parallel import parallel, prange
 cimport openmp
 
-ctypedef fused idx_t:
-	numpy.int16_t
-	numpy.int32_t
-	numpy.int64_t
-	numpy.uint16_t
-	numpy.uint32_t
-	numpy.uint64_t
-
-ctypedef fused dat_t:
-	numpy.float32_t
-	numpy.float64_t
-	numpy.complex64_t
-	numpy.complex128_t
+from Projector_Utilities cimport itype, dtype
 
 def matvec(
-		dat_t[:] vec,
-		dat_t[:] res,
-		dat_t[:] dat,
-		idx_t[:] col,
-		idx_t[:] row,
-		idx_t stack_height,
-		idx_t row_stride,
-		idx_t col_stride,
+		dtype[:] vec,
+		dtype[:] res,
+		dtype[:] dat,
+		itype[:] col,
+		itype[:] row,
+		itype stack_height,
+		itype row_stride,
+		itype col_stride,
 		int threads=0):
 	
-	cdef idx_t tensor_length = dat.size
-	cdef idx_t i,j
+	cdef itype tensor_length = dat.size
+	cdef itype i,j
 
-	cdef dat_t* vec_view
-	cdef dat_t* res_view
+	cdef dtype* vec_view
+	cdef dtype* res_view
 	
 	if threads==0:
 		threads = openmp.omp_get_max_threads()
