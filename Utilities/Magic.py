@@ -20,4 +20,10 @@ def lazy_property(fn):
 		return getattr(self, decorated_name)
 	return __lazy_property
 
+def apply_if(obj, fun, cond, *args, **kwargs):
+	if cond:
+		return fun(obj, *args, **kwargs)
+	else:
+		return obj
+
 from .Magic_cy import *
