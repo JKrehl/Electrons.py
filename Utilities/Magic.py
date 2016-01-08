@@ -27,3 +27,12 @@ def apply_if(obj, fun, cond, *args, **kwargs):
 		return obj
 
 from .Magic_cy import *
+
+class MemberAccessDictionary(dict):
+	def __getattr__(self, key):
+		return self.__getitem__(key)
+	def __setattr__(self, key, value):
+		if key in self.__dict__:
+			self.__dict__[key] = value
+		else:
+			self.__setitem__(key, value)

@@ -1,6 +1,5 @@
 
 from .Kernel import Kernel
-from .KernelHDF import KernelHDF
 
 from .RayKernel import RayKernel
 
