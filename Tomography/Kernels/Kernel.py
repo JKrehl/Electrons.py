@@ -5,10 +5,11 @@ import os.path
 
 import tempfile
 from contextlib import contextmanager
+import pickle
 
 from ...Utilities.Magic import humanize_filesize, MemberAccessDictionary
 
-class Array(object):
+class Item(object):
 	def __init__(self, parent, name):
 		self.parent = parent
 		self.name = name
@@ -40,11 +41,10 @@ class Array(object):
 		return self.Concatenator(self, shape, dtype)
 	
 	def save(self): raise NotImplementedError
-	def save_in_other(self, other): raise NotImplementedError
 	@classmethod
-	def load(cls, parent, name): raise NotImplementedError
+	def load(cls, parent, name, path=None): raise NotImplementedError
 		
-class Array_NDArray(Array):
+class ArrayNDArray(Item):
 	def __init__(self, parent, name):
 		super().__init__(parent, name)
 		self.ndarray = None
@@ -63,7 +63,7 @@ class Array_NDArray(Array):
 	def in_memory(self):
 		yield
 		
-	class Concatenator(Array.Concatenator):
+	class Concatenator(Item.Concatenator):
 		def __init__(self, parent, shape, dtype):
 			super().__init__(parent, shape, dtype)
 			self.stack = []
@@ -75,35 +75,39 @@ class Array_NDArray(Array):
 		def finalize(self):
 			self.parent.set(numpy.concatenate(self.stack, axis=0))
 
-	def save_in_other(self, other):
-		if self.name not in other:
-			other.create_dataset(self.name, data=self.ndarray)
+	@contextmanager
+	def interpret_path(self, path=None, mode='a'):
+		if path is None:
+			with self.parent.open() as hfile:
+				yield hfile
+		elif isinstance(path, h5py.File):
+			yield path
 		else:
-			try: 
-				other[self.name][...] = self.ndarray
-			except ValueError:
-				other.__delitem__(self.name)
-				other.create_dataset(self.name, data=self.ndarray)
-			
-	def save(self):
-		with self.parent.open() as hfile:
-			self.save_in_other(hfile)
+			with h5py.File(path, mode) as hfile:
+				yield hfile
+
+	def save(self, path=None):
+		with self.interpret_path(path) as hfile:
+			if self.name not in hfile:
+				hfile.create_dataset(self.name, data=self.ndarray)
+			else:
+				try: 
+					hfile[self.name][...] = self.ndarray
+				except ValueError:
+					hfile.__delitem__(self.name)
+					hfile.create_dataset(self.name, data=self.ndarray)
 
 	@classmethod
 	def load(cls, parent, name, path=None):
 		self = cls(parent, name)
-		
-		if path is None:
-			with self.parent.open() as hfile:
-				self.ndarray = numpy.require(hfile[self.name], None, 'O')
-		else:
-			with h5py.File(path, 'r') as hfile:
-				self.ndarray = numpy.require(hfile[self.name], None, 'O')
+
+		with self.interpret_path(path) as hfile:
+			self.ndarray = numpy.require(hfile[self.name], None, 'O')
 				
 		return self
 	
 
-class Array_Dataset(Array):
+class ArrayDataset(Item):
 	def __init__(self, parent, name):
 		super().__init__(parent, name)
 		self.ndarray = None
@@ -161,7 +165,7 @@ class Array_Dataset(Array):
 		self.dataset = self.ndarray
 		self.ndarray = None
 		
-	class Concatenator(Array.Concatenator):
+	class Concatenator(Item.Concatenator):
 		def __init__(self, parent, shape, dtype):
 			super().__init__(parent, shape, dtype)
 			parent.create((0,)+shape[1:], dtype, maxshape=shape, chunks=True)
@@ -176,22 +180,68 @@ class Array_Dataset(Array):
 
 		return self.Concatenator(self, shape, dtype)
 
-	def save(self):
-		pass
-	def save_in_other(self, other):
-		with self.parent.open():
-			other.copy(self.dataset, other)
+	@contextmanager
+	def interpret_path(self, path=None, mode='a'):
+		if path is None or path==self.parent.path:
+			with self.parent.open() as hfile:
+				yield hfile
+		elif isinstance(path, h5py.File):
+			yield path
+		else:
+			with h5py.File(path, mode) as hfile:
+				yield hfile
+
+	def save(self, path=None):
+		with self.interpret_path(path) as hfile:
+			if hfile is not None:
+				with self.parent.open():
+					hfile.copy(self.dataset, self.name)
 
 	@classmethod
 	def load(cls, parent, name, path=None):
 		self = cls(parent, name)
 
-		if path != parent.path:
-			with h5py.File(path, 'r') as hfile:
-				with self.parent.open() as hfile2:
-					hfile2.copy(hfile[name], name)
+		with self.interpret_path(path) as hfile:
+			if hfile is not None:
+				with self.parent.open() as parent_hfile:
+					parent_hfile.copy(hfile[name], name)
 
 		return self
+
+class Scalar(Item):
+	def __init__(self, parent, name):
+		super().__init__(parent, name)
+		self.value = None
+
+	def get(self):
+		return self.value
+	def set(self, value):
+		self.value = value
+
+	@contextmanager
+	def interpret_path(self, path=None, mode='a'):
+		if path is None:
+			with self.parent.open() as hfile:
+				yield hfile
+		elif isinstance(path, h5py.File):
+			yield path
+		else:
+			with h5py.File(path, mode) as hfile:
+				yield hfile
+
+	def save(self, path=None):
+		with self.interpret_path(path) as hfile:
+			hfile.attrs[self.name] = numpy.void(pickle.dumps(self.value))
+
+	@classmethod
+	def load(cls, parent, name, path=None):
+		self = cls(parent, name)
+
+		with self.interpret_path(path) as hfile:
+			if self.name in hfile.attrs:
+				self.value = pickle.loads(bytes(hfile.attrs[self.name]))
+
+	
 
 class Kernel(object):
 	_arrays = {}
@@ -214,9 +264,11 @@ class Kernel(object):
 		self.arrays = MemberAccessDictionary()
 		for key, mode in self._arrays.items():
 			if mode == 0:
-				self.arrays[key] = Array_NDArray(self, key)
+				self.arrays[key] = ArrayNDArray(self, key)
 			elif mode == 1:
-				self.arrays[key] = Array_Dataset(self, key)
+				self.arrays[key] = ArrayDataset(self, key)
+			elif mode == 2:
+				self.arrays[key] = Scalar(self, key)
 			else:
 				raise ValueError
 	@property
@@ -254,8 +306,8 @@ class Kernel(object):
 			print("written: {:>8g}{:s}".format(*humanize_filesize(os.path.getsize(self.path))))
 		else:
 			with h5py.File(path, 'w') as hfile:
-				for array in self.arrays.values():
-					array.save_in_other(hfile)
+				for key, array in self.arrays.items():
+					array.save(hfile)
 
 			print("written: {:>8g}{:s}".format(*humanize_filesize(os.path.getsize(path))))
 		
@@ -275,12 +327,12 @@ class Kernel(object):
 		self.arrays = MemberAccessDictionary()
 		for key, mode in self._arrays.items():
 			if mode == 0:
-				self.arrays[key] = Array_NDArray.load(self, key, path)
+				self.arrays[key] = ArrayNDArray.load(self, key, path)
 			elif mode == 1:
-				self.arrays[key] = Array_Dataset.load(self, key, path)
+				self.arrays[key] = ArrayDataset.load(self, key, path)
+			elif mode == 2:
+				self.arrays[key] = Scalar.load(self, key, path)
 			else:
 				raise ValueError
 			
 		return self
-		
-		
