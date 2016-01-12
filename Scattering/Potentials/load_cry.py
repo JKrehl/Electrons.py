@@ -28,7 +28,7 @@ def load_cry(filename):
 				
 	fle.close()
 	
-	dat = numpy.genfromtxt(filename, skiprows=i, dtype=['O','f','f','f','f','f'])
+	dat = numpy.genfromtxt(filename, skip_header=i, dtype=['O','f','f','f','f','f'])
 
 	size = numpy.array(lst[1], dtype=numpy.float)
 

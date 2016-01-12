@@ -26,20 +26,17 @@ class Item(object):
 	def in_memory(self): raise NotImplementedError
 	
 	class Concatenator(object):
-		def __init__(self, parent, shape, dtype):
+		def __init__(self, parent, shape=(None,), dtype=None):
 			self.parent = parent
 			self.shape = shape
 			self.dtype = dtype
 
 		def append(self, value): raise NotImplementedError
 		def finalize(self): raise NotImplementedError
-	
-	def get_concatenator(self, shape=(None,), dtype=None):
-		if dtype is None:
-			dtype = self.dtype
 
-		return self.Concatenator(self, shape, dtype)
-	
+	def concatenator(self, dtype=None, shape=(None,)):
+		return self.Concatenator(self, dtype=dtype, shape=shape)
+
 	def save(self): raise NotImplementedError
 	@classmethod
 	def load(cls, parent, name, path=None): raise NotImplementedError
@@ -64,7 +61,10 @@ class ArrayNDArray(Item):
 		yield
 		
 	class Concatenator(Item.Concatenator):
-		def __init__(self, parent, shape, dtype):
+		def __init__(self, parent, shape=(None,), dtype=None):
+			if dtype is None:
+				dtype = parent.dtype
+
 			super().__init__(parent, shape, dtype)
 			self.stack = []
 
@@ -136,6 +136,15 @@ class ArrayDataset(Item):
 					self.dataset[...] = value
 				except ValueError:
 					self.create(self.name, data=value)
+
+	@contextmanager
+	def get_dataset(self):
+		with self.parent.open() as hfile:
+			if self.name in hfile:
+				yield hfile[self.name]
+			else:
+				raise ValueError
+
 	@property
 	def shape(self):
 		return self.ndarray is None and self.dataset.shape or self.ndarray.shape
@@ -160,25 +169,31 @@ class ArrayDataset(Item):
 	
 	@contextmanager
 	def in_memory(self):
-		self.ndarray = numpy.require(self.dataset)
-		yield
-		self.dataset = self.ndarray
-		self.ndarray = None
+		if self.ndarray is None:
+			with self.parent.open():
+				self.ndarray = numpy.require(self.dataset)
+			yield
+			self.dataset = self.ndarray
+			self.ndarray = None
+		else:
+			yield
 		
 	class Concatenator(Item.Concatenator):
-		def __init__(self, parent, shape, dtype):
+		def __init__(self, parent, shape=(None,), dtype=None):
+			if dtype is None:
+				dtype = parent.dtype
+
 			super().__init__(parent, shape, dtype)
 			parent.create((0,)+shape[1:], dtype, maxshape=shape, chunks=True)
-			
-			
-		def append(self, value): raise NotImplementedError
-		def finalize(self): raise NotImplementedError
-	
-	def get_concatenator(self, shape=(None,), dtype=None):
-		if dtype is None:
-			dtype = self.dtype
 
-		return self.Concatenator(self, shape, dtype)
+		def append(self, value):
+			assert value.shape[1:] == self.shape[1:]
+			with self.parent.get_dataset() as dataset:
+				dataset.resize(dataset.shape[0]+value.shape[0], axis=0)
+				dataset[-value.shape[0]:,...] = value.astype(self.dtype, copy=False)
+
+		def finalize(self):
+			pass
 
 	@contextmanager
 	def interpret_path(self, path=None, mode='a'):
@@ -241,6 +256,8 @@ class Scalar(Item):
 			if self.name in hfile.attrs:
 				self.value = pickle.loads(bytes(hfile.attrs[self.name]))
 
+		return self
+
 	
 
 class Kernel(object):
@@ -282,7 +299,14 @@ class Kernel(object):
 				yield self._hfile
 		else:
 			yield self._hfile
-	
+
+	@contextmanager
+	def in_memory(self, *arrays):
+		cms = [self.arrays[ar].in_memory() for ar in arrays]
+		for cm in cms: cm.__enter__()
+		yield
+		for cm in cms: cm.__exit__(None, None, None)
+
 	def __getattr__(self, name):
 		if name in self._arrays:
 			return self.arrays[name].get()
@@ -294,7 +318,7 @@ class Kernel(object):
 			self.arrays[name].set(value)
 		else:
 			object.__setattr__(self, name, value)
-			
+
 	def save(self, path=None):
 		if path is not None:
 			path = os.path.expanduser(path)

@@ -8,4 +8,100 @@ from ...Utilities.Magic import apply_if
 from .Kernel import Kernel
 
 class RayKernel(Kernel):
-	_arrays = dict(y=0, x=0, t=0, d=0)
+	def __init__(self, y, x, t, d, mask=None, dtype=numpy.float64, itype=numpy.int32, memory_strategy=0, path=None):
+		if memory_strategy == 0:
+			self._arrays = dict(y=0, x=0, t=0, d=0, mask=2, dat=0, row=0, col=0)
+		elif memory_strategy == 1:
+			self._arrays = dict(y=0, x=0, t=0, d=0, mask=2, dat=1, row=1, col=1)
+		elif memory_strategy == 2:
+			self._arrays = dict(y=1, x=1, t=1, d=1, mask=2, dat=1, row=1, col=1)
+		else:
+			raise ValueError
+
+		super().__init__(path)
+
+		self.y = y
+		self.x = x
+		self.t = t
+		self.d = d
+
+		self.mask = mask
+
+		self.dtype = dtype
+		self.itype = itype
+
+	@property
+	def shape(self):
+		assert self.t is not None and self.d is not None and self.y is not None and self.x is not None
+		return self.t.shape+self.d.shape+self.y.shape+self.x.shape
+
+	@property
+	def fshape(self):
+		assert self.t is not None and self.d is not None and self.y is not None and self.x is not None
+		return (self.t.size*self.d.size, self.y.size*self.x.size)
+
+	def prep(self):
+		xd = abs(self.x[1] - self.x[0])
+		yd = abs(self.y[1] - self.y[0])
+		dd = abs(self.d[1] - self.d[0])
+
+		if self.mask:
+			mask = numpy.add.outer((numpy.arange(self.y.size)-self.y.size//2)**2,(numpy.arange(self.x.size)-self.x.size//2)**2).flatten()<(.25*min(self.y.size**2, self.x.size**2))
+		else:
+			mask = None
+
+		return (self.y/yd, self.x/xd, self.d/dd, yd*xd/dd, mask)
+
+	def calc_one_angle(self, ti, y, x, d, unit_area, mask):
+		al = abs((ti+numpy.pi/4)%(numpy.pi/2) - numpy.pi/4)
+		a = .5*(numpy.cos(al)-numpy.sin(al))
+		b = .5*(numpy.cos(al)+numpy.sin(al))
+		h = 1/numpy.cos(al)
+
+		if b==a: f = 0
+		else: f = h/(b-a)
+
+		e = numexpr.evaluate("x*cos(t)-y*sin(t) -d", local_dict=dict(x=x[None,None,:], y=y[None,:,None], d=d[:,None,None], t=ti)).reshape(d.size, y.size*x.size)
+		if mask is not None:
+			sel = numexpr.evaluate("mask&(abs(e)<(b+.5))", local_dict=dict(mask=mask[None,:], e=e, b=b))
+		else:
+			sel = numexpr.evaluate("(abs(e)<(b+.5))", local_dict=dict(e=e, b=b))
+
+		e = e[sel]
+		dsel, yxsel = numpy.where(sel)
+		dsel = dsel.astype(self.itype, copy=False)
+		yxsel = yxsel.astype(self.itype, copy=False)
+
+		calcs = 'where({0}<-b, 0, where({0}<-a, .5*f*({0}+b)**2, where({0}<a, .5*f*(a-b)**2+h*({0}+a), where({0}<b, 1-.5*f*(b-{0})**2, 1))))'
+		ker = numexpr.evaluate('area*('+calcs.format('(dif+.5)')+'-'+calcs.format('(dif-.5)')+')', local_dict=dict(dif=e, a=a, b=b, f=f, h=h, area=unit_area))
+		csel = ker>=0
+		dsel = dsel[csel]
+		yxsel = yxsel[csel]
+
+		return (ker[csel], dsel, yxsel)
+
+
+	def calc(self, track_progress=False):
+		y, x, d, unit_area, mask = self.prep()
+
+		dat_concatenator = self.arrays.dat.concatenator(self.dtype)
+		row_concatenator = self.arrays.row.concatenator(self.itype)
+		col_concatenator = self.arrays.col.concatenator(self.itype)
+
+		for it,ti in apply_if(enumerate(self.t), Progress, track_progress, length=self.t.size):
+			idat, irow, icol = self.calc_one_angle(ti, y, x, d, unit_area, mask)
+
+			dat_concatenator.append(idat)
+			row_concatenator.append(irow+self.d.size*it)
+			col_concatenator.append(icol)
+
+			del idat, irow, icol
+
+		dat_concatenator.finalize()
+		del dat_concatenator
+		row_concatenator.finalize()
+		del row_concatenator
+		col_concatenator.finalize()
+		del col_concatenator
+
+		return self

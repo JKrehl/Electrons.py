@@ -22,7 +22,8 @@ class FlatAtomDW(PlaneOperator):
 								  atom_potential_generator=atom_potential_generator, energy=energy, y=y, x=x,
 								  dtype=dtype,
 								  lazy=lazy, forgetful=forgetful))
-		
+
+		self.phaseshifts_f = None
 		self.transfer_function = None
 		if not self.lazy:
 			self.generate_tf()

@@ -24,6 +24,11 @@ class Multislice:
 								  transfer_function=transfer_function, transfer_function_args=transfer_function_args,
 								  propagator=propagator, propagator_args=propagator_args))
 		self.prepared = False
+		self.opchain = None
+		self.k = None
+		self.kx = None
+		self.ky = None
+		self.kk = None
 		
 		if self.trafo is not None:
 			self.potential = potential.transform(self.trafo)

@@ -15,6 +15,8 @@ class SingleScattering:
 								  forgetful = forgetful,
 								  atom_potential_generator=atom_potential_generator, transfer_function=transfer_function, propagator=propagator))
 		self.prepared = False
+		self.operators = None
+		self.empty_operator = None
 		
 		if self.trafo is not None:
 			self.potential = potential.transform(self.trafo)
