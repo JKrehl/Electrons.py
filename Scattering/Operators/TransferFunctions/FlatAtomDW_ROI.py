@@ -81,7 +81,8 @@ class FlatAtomDW_ROI(PlaneOperator):
 		parent.transfer_function_args.update(args)
 	
 		return cls(atoms, **args)
-			
+
+	# noinspection PyUnusedLocal
 	def generate_tf(self):
 		if self.ky is None:
 			ky = FT.reciprocal_coords(self.y)

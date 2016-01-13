@@ -241,7 +241,8 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 		
 		parent.transfer_function_args.update(args)
 		return cls(atoms, **args)
-			
+
+	# noinspection PyUnusedLocal,PyUnusedLocal
 	def generate_tf(self):
 		
 		if self.phaseshifts_f is None:

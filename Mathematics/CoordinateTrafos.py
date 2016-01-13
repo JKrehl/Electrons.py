@@ -134,11 +134,11 @@ class Trafo3D(Trafo):
 			self.mat = numpy.eye(4,dtype=numpy.float)
 
 
-	def affine_transform(self, affine):
+	def affine_transform(self, value):
 		self.mat = numpy.dot(affine_to_4mat(numpy.require(value)), self.mat)
 		return self
 
-	def quarternion(self, quart):
+	def quarternion(self, value):
 		self.mat = numpy.dot(affine_to_4mat(quart_to_rotmat(normalise_quart(value))), self.mat)
 		return self
 
@@ -170,7 +170,7 @@ class Trafo3D(Trafo):
 		return self
 
 	def scale(self, value):
-		return self.postscale(self)
+		return self.postscale(self, value)
 		
 	def prescale(self, value):
 		mt = numpy.eye(4, dtype=self.mat.dtype)

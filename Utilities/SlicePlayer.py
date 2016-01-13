@@ -6,6 +6,7 @@ import matplotlib.image
  
 
 class SlicePlayer(matplotlib.image.AxesImage):
+    # noinspection PyUnusedLocal,PyUnusedLocal
     def __init__(self, ax, arr, cmap=None, norm=None, aspect=None, interpolation=None, alpha=None, vmin=None, vmax=None, origin=None, extent=None, \
                  shape=None, filternorm=1, filterrad=4.0, imlim=None, resample=None, url=None, **kwargs):
         assert arr.ndim==3

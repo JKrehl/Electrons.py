@@ -5,7 +5,7 @@ from .SlicePlayer import SlicePlayer
 from .Progress import Progress, FlProgress
 from .Colourmap import SymNorm
 from . import Magic
-from . import CompressSparse
+from . import CompressedSparse
 
 
 __all__ = [s for s in dir() if not s.startswith('_')]

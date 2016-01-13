@@ -10,7 +10,8 @@ class Atoms(numpy.ndarray):
 		if len(args)==0:
 			args = [0]
 		return numpy.ndarray.__new__(cls, *args, dtype={'names':('Z','zyx','B','occ'),'formats':(numpy.int, '3f' ,numpy.float, numpy.float)}, **kwargs)
-	
+
+	# noinspection PyUnusedLocal,PyUnusedLocal
 	def __init__(self, *args, **kwargs):
 		self['Z'] = 0
 		self['zyx'] = 0

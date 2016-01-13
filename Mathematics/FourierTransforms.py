@@ -66,7 +66,6 @@ def mshift(ar, axis=None, axes=None):
 		axes = range(ar.ndim)
 		
 	axes = tuple(i%ar.ndim for i in axes)
-	lengths = tuple(ar.shape[i] for i in axes)
 	
 	ldict = {'fac%d'%i:numpy.linspace(-numpy.pi/2*ar.shape[i], numpy.pi/2*ar.shape[i], ar.shape[i], False)[tuple(numpy.s_[:] if i==j else None for j in range(ar.ndim))] for i in axes}
 	ldict.update(j=1j,ar=numpy.fft.fftshift(ar, axes=axes))
@@ -80,7 +79,6 @@ def mishift(ar, axes=None, axis=None):
 		axes = range(ar.ndim)
 			
 	axes = tuple(i%ar.ndim for i in axes)
-	lengths = tuple(ar.shape[i] for i in axes)
 	
 	ldict = {'fac%d'%i:numpy.linspace(-numpy.pi/2*ar.shape[i], numpy.pi/2*ar.shape[i], ar.shape[i], False)[tuple(numpy.s_[:] if i==j else None for j in range(ar.ndim))] for i in axes}
 	ldict.update(j=1j,ar=numpy.fft.ifftshift(ar, axes=axes))
@@ -94,7 +92,6 @@ def mhalfshift(ar, axes=None, axis=None):
 		axes = range(ar.ndim)
 			
 	axes = tuple(i%ar.ndim for i in axes)
-	lengths = tuple(ar.shape[i] for i in axes)
 	
 	ldict = {'fac%d'%i:numpy.linspace(-numpy.pi/2, numpy.pi/2, ar.shape[i], False)[tuple(numpy.s_[:] if i==j else None for j in range(ar.ndim))] for i in axes}
 	ldict.update({'dmp%d'%i:numpy.cos(numpy.linspace(-numpy.pi/2, numpy.pi/2, ar.shape[i], False))[tuple(numpy.s_[:] if i==j else None for j in range(ar.ndim))] for i in axes})
@@ -123,7 +120,6 @@ def mfft(ar, *args, **kwargs):
 	return numpy.fft.fftshift(pyfftw.builders.fftn(numpy.fft.ifftshift(ar,axes=axes), *args, **kwargs)(),axes=axes)
 
 def mifft(ar, *args, **kwargs):
-	axes = None
 	if 'axis' in kwargs:
 		axes = (kwargs.pop('axis'),)
 		kwargs['axes'] = axes
