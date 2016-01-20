@@ -12,7 +12,7 @@ from ...Utilities import Magic
 from ...Mathematics import FourierTransforms as FT
 from ...Mathematics import Interpolator2D
 
-from .Base import Kernel
+from .Kernel import Kernel
 
 import gc
 
@@ -25,33 +25,30 @@ class FresnelKernel(Kernel):
 				 k, focus=0, bandlimit=0,mask=None,
 				 dtype=numpy.complex64, itype=numpy.int32,
 				 ss_w=3, ss_v=1, ss_u=4, cutoff=1e-2,
-	             memory_strategy=1
+	             memory_strategy=1, path=None,
 				 ):
 
+		self._arrays = dict(z=0, y=0, x=0, t=0, d=0, focus=0, k=2, mask=2, idz=0, bounds=0, dat=1, row=1, col=1)
+
 		if memory_strategy == 0:
-			self._arrays = dict(z=0, y=0, x=0, t=0, d=0, mask=2, bounds=0, dat=0, row=0, col=0)
+			self._arrays = {key:0 if val==1 else val for key,val in self._arrays.items()}
 		elif memory_strategy == 1:
-			self._arrays = dict(z=0, y=0, x=0, t=0, d=0, mask=2, bounds=0, dat=1, row=1, col=1)
+			pass
 		elif memory_strategy == 2:
-			self._arrays = dict(z=0, y=1, x=1, t=1, d=1, mask=2, bounds=1, dat=1, row=1, col=1)
+			self._arrays = {key:1 if val==0 else val for key,val in self._arrays.items()}
 		else:
 			raise ValueError
-		
-		self.__arrays__ = ['dat','idx_td','idx_yx','idz','bounds','z','y','x','t','d','focus','mask']
 
-		self.__dict__.update(dict(z=z, y=y, x=x, t=t, d=d,
-								  k=k, bandlimit=bandlimit, focus=focus,
-								  dtype=dtype, itype=itype,
-								  ss_w=ss_w, ss_v=ss_v, ss_u=ss_u, cutoff=cutoff,
-								  ))
+		if not isinstance(focus, numpy.ndarray) or focus.size==1:
+			focus = focus*numpy.ones(t.shape, numpy.obj2sctype(focus))
 
-		if not isinstance(self.focus, numpy.ndarray) or self.focus.size==1:
-			self.focus = self.focus*numpy.ones(self.t.shape, numpy.obj2sctype(self.focus))
-		
-		if mask:
-			self.mask = numpy.add.outer((numpy.arange(y.size)-y.size//2)**2,(numpy.arange(x.size)-x.size//2)**2).flatten()<(.25*min(y.size**2, x.size**2))
-		else:
-			self.mask = numpy.ones(y.size*x.size, numpy.bool)
+		super().__init__(path)
+
+		self.z, self.y, self.x = z, y, x
+		self.t, self.d = t, d
+		self.k, self.bandlimit, self.focus, self.mask = k, bandlimit, focus, mask
+		self.dtype, self.itype = dtype, itype
+		self.ss_w, self.ss_v, self.ss_u, self.cutoff = ss_w, ss_v, ss_u, cutoff
 			
 	@property
 	def shape(self):
@@ -131,21 +128,27 @@ class FresnelKernel(Kernel):
 		w_i_sh = w_i[prop_shrink[0,0]:prop_shrink[0,1]]
 		w_sh = w[prop_shrink[0,0]:prop_shrink[0,1]]
 		u_ss_sh = u_ss[prop_shrink[1,0]:prop_shrink[1,1]]
-		
-		nnc_mask = numpy.count_nonzero(self.mask)
+
+		if self.mask:
+			mask = numpy.add.outer((numpy.arange(self.y.size)-self.y.size//2)**2,(numpy.arange(self.x.size)-self.x.size//2)**2).flatten()<(.25*min(self.y.size**2, self.x.size**2))
+		else:
+			mask = numpy.ones(self.y.size*self.x.size, numpy.bool)
+
+		nnc_mask = numpy.count_nonzero(mask)
 
 		d_idx = numpy.repeat(numpy.mgrid[:self.d.size], nnc_mask)
-		yx_idx = numpy.repeat(numpy.mgrid[:self.y.size*self.x.size][self.mask].reshape(1, nnc_mask), self.d.size, 0).flatten()
-		
-		dat_z = HA.HDFConcatenator(self.dtype)
-		td_z = HA.HDFConcatenator(self.itype)
-		yx_z = HA.HDFConcatenator(self.itype)
-		
+		yx_idx = numpy.repeat(numpy.mgrid[:self.y.size*self.x.size][mask].reshape(1, nnc_mask), self.d.size, 0).flatten()
+
+		del mask
+
+		dat_concatenator = self.arrays.dat.concatenator(self.dtype)
+		row_concatenator = self.arrays.row.concatenator(self.itype)
+		col_concatenator = self.arrays.col.concatenator(self.itype)
+
+		bounds = []
+
 		for iz, zi in Progress(enumerate(w_i_sh), w_i_sh.size, True):
-			
-			idat_z = [numpy.ndarray(0, self.dtype)]
-			itd_z = [numpy.ndarray(0, self.itype)]
-			iyx_z = [numpy.ndarray(0, self.itype)]
+			entries = 0
 			
 			for it, ti in Progress(enumerate(self.t), self.t.size):
 				v,u = vus[it]
@@ -169,10 +172,12 @@ class FresnelKernel(Kernel):
 						dat = interpi(numpy.vstack((v[yx_sel], diff)).T)
 						
 						psel = numpy.abs(dat) >= self.cutoff*prop_max
-						
-						idat_z.append(numpy.require(dat[psel], requirements='O'))
-						itd_z.append(numpy.require(it*self.d.size+d_sel[psel], requirements='O'))
-						iyx_z.append(numpy.require(yx_sel[psel], requirements='O'))
+
+						dat_concatenator.append(dat[psel])
+						row_concatenator.append(d_sel[psel] + it*self.d.size)
+						col_concatenator.append(yx_sel[psel])
+
+						entries += numpy.count_nonzero(psel)
 
 						del d_sel, yx_sel, dat, psel
 
@@ -181,36 +186,23 @@ class FresnelKernel(Kernel):
 				del propi, propi_nz
 				del v,u
 
-			dat_z.append(numpy.concatenate(idat_z))
-			td_z.append(numpy.concatenate(itd_z))
-			yx_z.append(numpy.concatenate(iyx_z))
-			del idat_z, itd_z, iyx_z
+			bounds.append(entries)
 			
 		del prop, yx_idx, d_idx
 
 		gc.collect()
 		
-		self.bounds = numpy.array(dat_z.sizes)
+		self.bounds = numpy.array(bounds)
 		sel = self.bounds > 0
 		self.bounds = numpy.cumsum(numpy.hstack((0, self.bounds[sel]))).astype(self.itype)
 
 		self.idz = w_i_sh[sel]
-		
-		print('data array size: %f %s' % Magic.humanize_filesize(dat_z.size))
-		print('td indices array size: %f %s' % Magic.humanize_filesize(td_z.size))
-		print('yx indices array size: %f %s' % Magic.humanize_filesize(yx_z.size))
 
-		self.dat = dat_z.get_array()
-		del dat_z
-		
-		self.idx_td = td_z.get_array()
-		del td_z
-		
-		self.idx_yx = yx_z.get_array()
-		del yx_z
+		dat_concatenator.finalize()
+		del dat_concatenator
+		row_concatenator.finalize()
+		del row_concatenator
+		col_concatenator.finalize()
+		del col_concatenator
 		
 		return self
-	
-	@property
-	def idx(self):
-		return (self.idx_td, self.idx_yx)
