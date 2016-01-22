@@ -6,12 +6,12 @@ pyximport.install()
 
 from contextlib import contextmanager
 
-from ..Kernels.Kernel import Kernel
+from ..Kernels import Kernel
 from . import FlatProjector_cython as cython
 
 class FlatProjector(scipy.sparse.linalg.LinearOperator):
 
-	def __init__(self, kernel, shape = None):
+	def __init__(self, kernel):
 		if isinstance(kernel, Kernel):
 
 			self.kernel = kernel

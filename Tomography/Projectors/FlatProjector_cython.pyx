@@ -1,13 +1,12 @@
 #cython: boundscheck=False, initializedcheck=False, wraparound=False
 
 cimport numpy
-cimport cython
 from cython.parallel cimport parallel, prange
 cimport openmp
 
 numpy.import_array()
 
-from Projector_Utilities cimport itype, dtype, atomic_add
+from ...Utilities.Projector_Utilities cimport itype, dtype, atomic_add
 
 def matvec(
 		dtype[:] vec,

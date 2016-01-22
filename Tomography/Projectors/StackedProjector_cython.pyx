@@ -1,11 +1,9 @@
 #cython: boundscheck=False, initializedcheck=False, wraparound=False
 
-import numpy
-cimport numpy, cython
 from cython.parallel import parallel, prange
 cimport openmp
 
-from Projector_Utilities cimport itype, dtype
+from ...Utilities.Projector_Utilities cimport itype, dtype
 
 def matvec(
 		dtype[:] vec,

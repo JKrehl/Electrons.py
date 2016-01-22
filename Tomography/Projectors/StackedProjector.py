@@ -5,9 +5,11 @@ import scipy.sparse
 import pyximport
 pyximport.install()
 
+from contextlib import contextmanager
+
 from ..Kernels import Kernel
 from .FlatProjector import FlatProjector
-from . import StackedProjector_cy as cy
+from . import StackedProjector_cython as cython
 
 class StackedProjector(scipy.sparse.linalg.LinearOperator):
 	def __init__(self, kernel, z, threads=0):
@@ -17,9 +19,7 @@ class StackedProjector(scipy.sparse.linalg.LinearOperator):
 		if isinstance(kernel, Kernel):
 
 			self.kernel = kernel
-			self.shape = list(kernel.fshape)
-			self.shape[0] *= self.z.size
-			self.shape[1] *= self.z.size
+			self.shape = tuple(i*self.z.size for i in kernel.fshape)
 
 			with kernel.open():
 				self.nnz = self.kernel.dat.size
@@ -41,7 +41,7 @@ class StackedProjector(scipy.sparse.linalg.LinearOperator):
 		u = numpy.zeros(self.shape[0], self.dtype)
 
 		with self.in_memory():
-			cy.matvec(v,u, self.kernel.dat, self.kernel.row, self.kernel.col, self.z.size, self.kernel.fshape[0], self.kernel.fshape[1], self.threads)
+			cython.matvec(v,u, self.kernel.dat, self.kernel.row, self.kernel.col, self.z.size, self.kernel.fshape[0], self.kernel.fshape[1], self.threads)
 
 		return u
 	
@@ -51,6 +51,6 @@ class StackedProjector(scipy.sparse.linalg.LinearOperator):
 		u = numpy.zeros(self.shape[1], self.dtype)
 
 		with self.in_memory():
-			cy.matvec(v,u, self.kernel.dat, self.kernel.col, self.kernel.row, self.z.size, self.kernel.fshape[1], self.kernel.fshape[0], self.threads)
+			cython.matvec(v,u, self.kernel.dat, self.kernel.col, self.kernel.row, self.z.size, self.kernel.fshape[1], self.kernel.fshape[0], self.threads)
 
 		return u
