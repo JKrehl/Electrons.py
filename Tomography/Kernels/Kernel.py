@@ -47,9 +47,11 @@ class ArrayNDArray(Item):
 		self.ndarray = None
 		
 	@property
-	def shape(self): return self.ndarray.shape
+	def shape(self):
+		return self.ndarray.shape
 	@property
-	def dtype(self): return self.ndarray.dtype
+	def dtype(self):
+		return self.ndarray.dtype
 	
 	def get(self):
 		return self.ndarray
@@ -91,9 +93,9 @@ class ArrayNDArray(Item):
 			if self.name not in hfile:
 				hfile.create_dataset(self.name, data=self.ndarray)
 			else:
-				try: 
+				if hfile[self.name].dtype == self.ndarray.dtype and hfile[self.name].shape == self.ndarray.shape:
 					hfile[self.name][...] = self.ndarray
-				except ValueError:
+				else:
 					hfile.__delitem__(self.name)
 					hfile.create_dataset(self.name, data=self.ndarray)
 
@@ -120,38 +122,39 @@ class ArrayDataset(Item):
 			
 	@property
 	def dataset(self):
-		with self.parent.open() as hfile:
-			if self.name in hfile:
-				return hfile[self.name]
-			else:
-				return None
+		if self.name in self.parent._hfile:
+			return self.parent._hfile[self.name]
+		else:
+			return None
 	
 	@dataset.setter
 	def dataset(self, value):
-		with self.parent.open() as hfile:
+		with self.parent.open():
 			if self.dataset is None:
 				self.create(self.name, data=value)
 			else:
 				try: 
 					self.dataset[...] = value
 				except ValueError:
-					self.create(self.name, data=value)
-
-	@contextmanager
-	def get_dataset(self):
-		with self.parent.open() as hfile:
-			if self.name in hfile:
-				yield hfile[self.name]
-			else:
-				raise ValueError
+					self.create(data=value)
+				except TypeError:
+					self.create(data=value)
 
 	@property
 	def shape(self):
-		return self.ndarray is None and self.dataset.shape or self.ndarray.shape
-		
+		if self.ndarray is None:
+			with self.parent.open():
+				return self.dataset.shape
+		else:
+			return self.ndarray.shape
+
 	@property
-	def dtype(self): 
-		return self.ndarray is None and self.dataset.dtype or self.ndarray.dtype
+	def dtype(self):
+		if self.ndarray is None:
+			with self.parent.open():
+				return self.dataset.dtype
+		else:
+			return self.ndarray.dtype
 	
 	def get(self):
 		if self.ndarray is not None:
@@ -162,18 +165,18 @@ class ArrayDataset(Item):
 		if self.ndarray is not None:
 			self.ndarray = value
 		else:
-			if self.dataset is None:
-				self.create(data=value)
-			else:
-				self.dataset = value
+			with self.parent.open():
+				if self.dataset is None:
+					self.create(data=value)
+				else:
+					self.dataset = value
 	
 	@contextmanager
 	def in_memory(self):
 		if self.ndarray is None:
 			with self.parent.open():
-				self.ndarray = numpy.require(self.dataset)
+				self.ndarray = self.dataset[...]
 			yield
-			self.dataset = self.ndarray
 			self.ndarray = None
 		else:
 			yield
@@ -184,13 +187,14 @@ class ArrayDataset(Item):
 				dtype = parent.dtype
 
 			super().__init__(parent, shape, dtype)
-			parent.create((0,)+shape[1:], dtype, maxshape=shape, chunks=True)
+			parent.create((0,)+shape[1:], dtype, maxshape=shape, chunks=(2**18,))
 
 		def append(self, value):
 			assert value.shape[1:] == self.shape[1:]
-			with self.parent.get_dataset() as dataset:
-				dataset.resize(dataset.shape[0]+value.shape[0], axis=0)
-				dataset[-value.shape[0]:,...] = value.astype(self.dtype, copy=False)
+			if value.shape[0]!=0:
+				with self.parent.open():
+					self.dataset.resize(self.dataset.shape[0]+value.shape[0], axis=0)
+					self.dataset[-value.shape[0]:,...] = value.astype(self.dataset.dtype, copy=False)
 
 		def finalize(self):
 			pass
@@ -207,19 +211,23 @@ class ArrayDataset(Item):
 				yield hfile
 
 	def save(self, path=None):
-		with self.interpret_path(path) as hfile:
-			if hfile is not None:
-				with self.parent.open():
-					hfile.copy(self.dataset, self.name)
+		if path is None or path==self.parent.path:
+			pass
+		else:
+			with self.interpret_path(path) as hfile:
+				if hfile is not None:
+					with self.parent.open():
+						hfile.copy(self.dataset, self.name)
 
 	@classmethod
 	def load(cls, parent, name, path=None):
 		self = cls(parent, name)
 
-		with self.interpret_path(path) as hfile:
-			if hfile is not None:
-				with self.parent.open() as parent_hfile:
-					parent_hfile.copy(hfile[name], name)
+		if parent.path != path:
+			with self.interpret_path(path) as hfile:
+				if hfile is not None:
+					with self.parent.open() as parent_hfile:
+						parent_hfile.copy(hfile[name], name)
 
 		return self
 
@@ -261,60 +269,91 @@ class Scalar(Item):
 	
 
 class Kernel(object):
-	_arrays = {}
-
-	def infer_path(self, path):
+	def _init_path(self, path):
 		if isinstance(path, str):
 			self.path = os.path.expanduser(path)
 			if not os.path.exists(os.path.dirname(path)):
 				os.makedirs(os.path.dirname(path))
 			self.tempfile = None
+			if not os.path.isfile(self.path):
+				h5py.File(self.path, mode='x').close()
 		else:
 			self.tempfile = tempfile.NamedTemporaryFile(dir=os.path.expanduser("~/tmp"), suffix=".hdf")
 			self.path = self.tempfile.name
-	
-	def __init__(self, path=None):
+
+	def init_empty_arrays(self):
+		if not hasattr(self, 'arrays'):
+			self.arrays = MemberAccessDictionary()
+
+		for key, mode in self._arrays.items():
+			if key not in self.arrays:
+				if mode == 0:
+					self.arrays[key] = ArrayNDArray(self, key)
+				elif mode == 1:
+					self.arrays[key] = ArrayDataset(self, key)
+				elif mode == 2:
+					self.arrays[key] = Scalar(self, key)
+				else:
+					raise ValueError
+
+	def load_arrays(self, path):
+		if not hasattr(self, 'arrays'):
+			self.arrays = MemberAccessDictionary()
+
+		for key, mode in self._arrays.items():
+			if key not in self.arrays:
+				if mode == 0:
+					self.arrays[key] = ArrayNDArray.load(self, key, path)
+				elif mode == 1:
+					self.arrays[key] = ArrayDataset.load(self, key, path)
+				elif mode == 2:
+					self.arrays[key] = Scalar.load(self, key, path)
+				else:
+					raise ValueError
+
+
+	def __init__(self, path=None, *args, **kwargs):
 		self._hfile = None
 
-		self.infer_path(path)
+		if isinstance(path, str):
+			self.path = os.path.expanduser(path)
+			if not os.path.exists(os.path.dirname(path)):
+				os.makedirs(os.path.dirname(path))
+			self.tempfile = None
+			if not os.path.isfile(self.path):
+				h5py.File(self.path, mode='x').close()
+		else:
+			self.tempfile = tempfile.NamedTemporaryFile(dir=os.path.expanduser("~/tmp"), suffix=".hdf")
+			self.path = self.tempfile.name
 
-		self.arrays = MemberAccessDictionary()
-		for key, mode in self._arrays.items():
-			if mode == 0:
-				self.arrays[key] = ArrayNDArray(self, key)
-			elif mode == 1:
-				self.arrays[key] = ArrayDataset(self, key)
-			elif mode == 2:
-				self.arrays[key] = Scalar(self, key)
-			else:
-				raise ValueError
 	@property
 	def isopen(self):
 		return self._hfile is not None and self._hfile._id.valid
 	
 	@contextmanager
-	def open(self, mode='a'):
+	def open(self, mode='r+', driver=None):
 		if not self.isopen:
-			with h5py.File(self.path, mode) as self._hfile:
+			with h5py.File(self.path, mode, driver) as self._hfile:
 				yield self._hfile
 		else:
 			yield self._hfile
 
 	@contextmanager
 	def in_memory(self, *arrays):
-		cms = [self.arrays[ar].in_memory() for ar in arrays]
+		cms = tuple(self.arrays[ar].in_memory() for ar in arrays)
 		for cm in cms: cm.__enter__()
 		yield
 		for cm in cms: cm.__exit__(None, None, None)
+		print(cms)
 
 	def __getattr__(self, name):
-		if name in self._arrays:
+		if name!='_arrays' and name in self._arrays:
 			return self.arrays[name].get()
 		else:
 			raise AttributeError("'%s' object has no attribute '%s'"%(self.__class__, name))
 	
 	def __setattr__(self, name, value):
-		if name in self._arrays:
+		if name!='_arrays' and name in self._arrays:
 			self.arrays[name].set(value)
 		else:
 			object.__setattr__(self, name, value)
@@ -334,29 +373,19 @@ class Kernel(object):
 					array.save(hfile)
 
 			print("written: {:>8g}{:s}".format(*humanize_filesize(os.path.getsize(path))))
-		
 
 	@classmethod
-	def load(cls, path, own_path=0):
+	def load(cls, path, own_path=0, *args, **kwargs):
 		path = os.path.expanduser(path)
-		self = cls.__new__(cls)
-
-		self._hfile = None
-		
-		if own_path == 0:
+		if own_path is None:
+			pass
+		elif own_path == 0:
 			own_path = path
-			
-		self.infer_path(own_path)
+		else:
+			own_path = os.path.expanduser(own_path)
 
-		self.arrays = MemberAccessDictionary()
-		for key, mode in self._arrays.items():
-			if mode == 0:
-				self.arrays[key] = ArrayNDArray.load(self, key, path)
-			elif mode == 1:
-				self.arrays[key] = ArrayDataset.load(self, key, path)
-			elif mode == 2:
-				self.arrays[key] = Scalar.load(self, key, path)
-			else:
-				raise ValueError
-			
+		self = cls.__new__(cls)
+		self.__init__(own_path, *args, **kwargs)
+		self.load_arrays(path)
+
 		return self

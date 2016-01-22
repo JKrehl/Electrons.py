@@ -3,22 +3,31 @@ import numexpr
 
 
 from ...Utilities import Progress
+from ...Utilities import CompressedSparse as CS
 from ...Utilities.Magic import apply_if
 
 from .Kernel import Kernel
 
 class RayKernel(Kernel):
-	def __init__(self, y, x, t, d, mask=None, dtype=numpy.float64, itype=numpy.int32, memory_strategy=0, path=None):
+	def __init__(self, path=None, memory_strategy=0):
+		if not hasattr(self, '_arrays'):
+			self._arrays = {}
+
+		self._arrays.update(y=0, x=0, t=0, d=0, mask=2, dtype=2, itype=2, dat=1, row=1, col=1)
+
 		if memory_strategy == 0:
-			self._arrays = dict(y=0, x=0, t=0, d=0, mask=2, dat=0, row=0, col=0)
+			self._arrays = {key:0 if val==1 else val for key,val in self._arrays.items()}
 		elif memory_strategy == 1:
-			self._arrays = dict(y=0, x=0, t=0, d=0, mask=2, dat=1, row=1, col=1)
+			pass
 		elif memory_strategy == 2:
-			self._arrays = dict(y=1, x=1, t=1, d=1, mask=2, dat=1, row=1, col=1)
+			self._arrays = {key:1 if val==0 else val for key,val in self._arrays.items()}
 		else:
 			raise ValueError
 
-		super().__init__(path)
+		super().__init__(path, memory_strategy)
+
+	def init(self, y, x, t, d, mask=None, dtype=numpy.float64, itype=numpy.int32):
+		self.init_empty_arrays()
 
 		self.y = y
 		self.x = x
@@ -29,6 +38,8 @@ class RayKernel(Kernel):
 
 		self.dtype = dtype
 		self.itype = itype
+
+		return self
 
 	@property
 	def shape(self):
@@ -103,5 +114,25 @@ class RayKernel(Kernel):
 		del row_concatenator
 		col_concatenator.finalize()
 		del col_concatenator
+
+		return self
+
+class RayKernelCS(RayKernel):
+	def __init__(self, y, x, t, d, mask=None, dtype=numpy.float64, itype=numpy.int32, memory_strategy=0, path=None):
+		self._arrays = dict(Tdat=1, Trow=1, Tcol=1)
+		super().__init__(y, x, t, d, mask=mask, dtype=dtype, itype=itype, memory_strategy=memory_strategy, path=path)
+
+	def calc(self, track_progress=False):
+		super().calc(track_progress)
+
+		with self.open():
+			dat = self.dat[...]
+			row = self.row[...]
+			col = self.col[...]
+
+		self.row, self.dat, self.col = CS.compress_sparse(row, self.fshape[0], dat, col)
+		self.Trow, self.Tdat, self.Tcol = CS.compress_sparse(col, self.fshape[1], dat, row)
+
+		del dat, row, col
 
 		return self

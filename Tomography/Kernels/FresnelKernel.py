@@ -17,18 +17,14 @@ from .Kernel import Kernel
 import gc
 
 def supersample(points, size, factor):
-	return numpy.add.outer(numpy.require(points), numpy.linspace(-size/2, size/2, factor, False))
+	return numpy.add.outer(numpy.require(points), numpy.linspace(0, size, factor, False))
 
 class FresnelKernel(Kernel):
+	def __init__(self, path=None, memory_strategy=1):
+		if not hasattr(self, '_arrays'):
+			self._arrays = {}
 
-	def __init__(self, z,y,x,t,d,
-				 k, focus=0, bandlimit=0,mask=None,
-				 dtype=numpy.complex64, itype=numpy.int32,
-				 ss_w=3, ss_v=1, ss_u=4, cutoff=1e-2,
-	             memory_strategy=1, path=None,
-				 ):
-
-		self._arrays = dict(z=0, y=0, x=0, t=0, d=0, focus=0, k=2, mask=2, idz=0, bounds=0, dat=1, row=1, col=1)
+		self._arrays.update(z=0, y=0, x=0, t=0, d=0, focus=0, k=2, mask=2, dtype=2, itype=2, ss_w=2, ss_v=2, ss_u=2, cutoff=2, idz=0, bounds=0, dat=1, row=1, col=1)
 
 		if memory_strategy == 0:
 			self._arrays = {key:0 if val==1 else val for key,val in self._arrays.items()}
@@ -39,17 +35,27 @@ class FresnelKernel(Kernel):
 		else:
 			raise ValueError
 
+		super().__init__(path, memory_strategy)
+
+	def init(self, z,y,x,t,d,
+	         k, focus=0, bandlimit=0,mask=None,
+			 dtype=numpy.complex64, itype=numpy.int32,
+			 ss_w=2, ss_v=1, ss_u=2, cutoff=1e-2,
+			 ):
+
+		self.init_empty_arrays()
+
 		if not isinstance(focus, numpy.ndarray) or focus.size==1:
 			focus = focus*numpy.ones(t.shape, numpy.obj2sctype(focus))
-
-		super().__init__(path)
 
 		self.z, self.y, self.x = z, y, x
 		self.t, self.d = t, d
 		self.k, self.bandlimit, self.focus, self.mask = k, bandlimit, focus, mask
 		self.dtype, self.itype = dtype, itype
 		self.ss_w, self.ss_v, self.ss_u, self.cutoff = ss_w, ss_v, ss_u, cutoff
-			
+
+		return self
+
 	@property
 	def shape(self):
 		return self.idz.shape+self.t.shape+self.d.shape+self.idz.shape+self.y.shape+self.x.shape
@@ -79,38 +85,36 @@ class FresnelKernel(Kernel):
 			v_max = max(v_max, numpy.amax(v))
 			vus.append((v,u))
 
-		v_amax = max(-v_min, v_max)
-		rho_max = -v_amax*self.bandlimit/dv+numpy.sqrt((v_amax*self.bandlimit/dv)**2+6*numpy.pi*2*v_amax**2/(self.k*dv))
-		
-		w_i = numpy.arange(-numpy.ceil(rho_max/dw), numpy.ceil(rho_max/dw)+1, dtype=self.itype)
+		rho_max = numexpr.evaluate("sqrt(-2*bl**2*z**2/dz**2+2*z**2/(k*dz**2)*sqrt(bl**4*k**2+dp**2*dz**2))", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=max(-v_min, v_max), dp=4*numpy.pi))
+
+		w_i = numpy.arange(-int(numpy.ceil(rho_max/dw)), int(numpy.ceil(rho_max/dw)), dtype=self.itype)
 		w = dw*w_i
-		v = dv*numpy.arange(numpy.floor(v_min/dv), numpy.ceil(v_max/dv))
-		u = du*numpy.arange(-numpy.ceil(rho_max/du), numpy.ceil(rho_max/du))
+		v = dv*numpy.arange(int(numpy.floor(v_min/dv)), int(numpy.ceil(v_max/dv)))
+		u = du*numpy.arange(-int(numpy.ceil(rho_max/du)), int(numpy.ceil(rho_max/du)))
 		
 		w_ss = supersample(w, dw, self.ss_w).flatten()
 		v_ss = supersample(v, dv, self.ss_v).flatten()
 		u_ss = supersample(u, du, self.ss_u).flatten()
-		
+
 		kw_ss = FT.mreciprocal_coords(w_ss)
 		ku_ss = FT.mreciprocal_coords(u_ss)
 
 		propf = numexpr.evaluate('1/(2*pi)*exp(1j*(-v/(2*k)*(kw**2+ku**2)))', local_dict=dict(j=1j, pi=numpy.pi, k=self.k, kw=kw_ss[:, None, None], v=v_ss[None, :, None], ku=ku_ss[None, None, :]))
 
-		kr = numexpr.evaluate("sqrt(kw**2+ku**2)*dr", local_dict=dict(kw=kw_ss[:,None], ku=ku_ss[None,:], dr=self.bandlimit, pi=numpy.pi))
-		res_win = numexpr.evaluate('where(kr==0, 1, 2*j1kr/kr)', local_dict=dict(kr=kr, j1kr=scipy.special.j1(kr)))
-		res_win /= numpy.mean(res_win)
+		#kr = numexpr.evaluate("sqrt(kw**2+ku**2)*dr", local_dict=dict(kw=kw_ss[:,None], ku=ku_ss[None,:], dr=self.bandlimit, pi=numpy.pi))
+		#res_win = numexpr.evaluate('where(kr==0, 1, 2*j1kr/kr)', local_dict=dict(kr=kr, j1kr=scipy.special.j1(kr)))
+		#res_win /= numpy.mean(res_win)
 		
-		propf = numexpr.evaluate("propf*res_win", local_dict=dict(propf=propf, res_win=res_win[:,None,:]))
+		#propf = numexpr.evaluate("propf*res_win", local_dict=dict(propf=propf, res_win=res_win[:,None,:]))
 
 		prop = numpy.empty(w.shape + v_ss.shape + u_ss.shape, self.dtype)
 		for i in range(prop.shape[1]):
-			prop[:, i, :] = FT.mifft(propf[:, i, :]).reshape(w.size, self.ss_w, u_ss.size).mean(1)
-			
-		sel_rho_max = -numpy.abs(v_ss)*self.bandlimit/dv + numpy.sqrt((numpy.abs(v_ss)*self.bandlimit/dv)**2 + 3*numpy.pi*2*numpy.abs(v_ss)**2/(self.k*dv))
-		rr = numexpr.evaluate('w**2-dw**2+u**2-du**2', local_dict=dict(w=w[:, None], u=u_ss[None, :], dw=dw, du=du))
-		prop = numexpr.evaluate('where(rr<=r_max, prop, 0)', local_dict=dict(prop=prop, rr=rr[:, None, :], r_max=sel_rho_max[None, :, None]**2))
-		
-		del propf, kr, rr, res_win
+			prop[:, i, :] = numpy.roll(FT.mifft(propf[:, i, :]), (self.ss_w//2), 0).reshape(w.size, self.ss_w, u_ss.size).mean(1)
+
+		sel_rho_max = numexpr.evaluate("sqrt(-2*bl**2*z**2/dz**2+2*z**2/(k*dz**2)*sqrt(bl**4*k**2+dp**2*dz**2))", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=v_ss, dp=numpy.pi))
+		prop = numexpr.evaluate('where(ww+uu<=rr_max+dww+duu, prop, 0)', local_dict=dict(prop=prop, ww=w[:, None, None]**2, dww=dw**2/4, uu=u_ss[None,None,:]**2, duu=du**2/4,rr_max=sel_rho_max[None, :, None]**2))
+
+		del propf#, kr, rr, res_win
 		
 		prop_max = numpy.amax(numpy.abs(prop))
 		prop_nz = numpy.abs(prop) >= self.cutoff*prop_max
