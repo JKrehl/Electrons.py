@@ -1,0 +1,13 @@
+import numpy
+
+import os.path
+
+def make_ext(modname, pyxfilename):
+	from distutils.extension import Extension
+	return Extension(name = modname,
+					sources=[pyxfilename],
+					include_dirs=[numpy.get_include(), os.path.dirname(__file__)+"/include"],
+					extra_compile_args=['-fopenmp'],
+					extra_link_args=['-fopenmp'],
+	                language='c++',
+					)

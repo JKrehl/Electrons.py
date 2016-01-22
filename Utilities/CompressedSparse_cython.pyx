@@ -1,11 +1,10 @@
 #cython: boundscheck=False, initializedcheck=False, wraparound=False, initializedcheck=False
-#distutils: include_dirs = [numpy.get_include(), /home/krehl/Python/Electrons/Tomography/Projectors/]
-#distutils: extra_compile_args = [-fopenmp, -O3, -march=native]
-#distutils: extra_link_args = [-fopenmp,]
-#distutils: language = c++
 
+import numpy
 cimport numpy
-from ..Tomography.Projectors.Projector_Utilities import itype, dtype
+numpy.import_array()
+
+from .Projector_Utilities cimport itype, dtype
 
 def CS_pointers(numpy.ndarray[itype, ndim=1] vec, numpy.npy_intp size):
 	cdef numpy.ndarray[itype, ndim=1] pointers = numpy.zeros(size+1, vec.dtype)

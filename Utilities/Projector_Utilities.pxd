@@ -15,5 +15,5 @@ ctypedef fused dtype:
 	numpy.complex64_t
 	numpy.complex128_t
 	
-cdef extern from "source/atomic_add.hpp" nogil:
+cdef extern from "atomic_add.hpp" nogil:
 	inline void atomic_add[T](T*, T)
