@@ -177,7 +177,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 		args.update({k:v for k,v in parent.transfer_function_args.items() if v is not None})
 		args.update({k:v for k,v in kwargs.items() if v is not None})
 
-		if 'thread' in parent.propagator_args and isinstance(parent.propagator_args['thread'], Thread):
+		if hasattr(parent, 'propagator_args') and 'thread' in parent.propagator_args and isinstance(parent.propagator_args['thread'], Thread):
 			args['thread'] = parent.propagator_args['thread']
 		elif not 'thread' in args or args['thread'] is None:
 			args['thread'] = reikna.cluda.any_api().Thread.create()
