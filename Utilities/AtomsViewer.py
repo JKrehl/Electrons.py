@@ -85,7 +85,7 @@ void main()
 
 class AtomsViewer(app.Canvas):
 
-	def __init__(self, atoms, radius=.06):
+	def __init__(self, atoms, radius=6.):
 		app.Canvas.__init__(self, title='Molecular viewer', keys='interactive', size=(1200, 800))
 		self.ps = self.pixel_scale
 
