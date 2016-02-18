@@ -47,6 +47,8 @@ Kline with contributions by Mridul Aanjaneya and Bob Myhill.
 
 Adapted for SciPy by Stefan van der Walt.
 
+It was further modified in 2015 by Jonas Krehl, incorporating numexpr and 
+and enhancing the output options.
 """
 
 from __future__ import division, print_function, absolute_import
@@ -100,7 +102,7 @@ def _sym_ortho(a, b):
 
 
 def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
-		 iter_lim=None, show=False, calc_var=False, showfun = None, interm_results=False, interm_results_sink=None):
+		 iter_lim=None, show=False, calc_var=False, showfun = None, interm_results=False, interm_results_sink=None, output_collector=None):
 	"""Find the least-squares solution to a large, sparse, linear system
 	of equations.
 
@@ -272,16 +274,14 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		 'The iteration limit has been reached					  ')
 
 	if show:
-		print(' ')
-		print('LSQR			Least-squares solution of  Ax = b')
-		str1 = 'The matrix A has %8g rows  and %8g cols' % (m, n)
-		str2 = 'damp = %20.14e   calc_var = %8g' % (damp, calc_var)
-		str3 = 'atol = %8.2e				 conlim = %8.2e' % (atol, conlim)
-		str4 = 'btol = %8.2e			   iter_lim = %8g' % (btol, iter_lim)
-		print(str1)
-		print(str2)
-		print(str3)
-		print(str4)
+		st = "LSQR			Least-squares solution of  Ax = b\n"
+		st += 'The matrix A has %8g rows  and %8g cols\n' % (m, n)
+		st += 'damp = %20.14e   calc_var = %8g\n' % (damp, calc_var)
+		st += 'atol = %8.2e				 conlim = %8.2e\n' % (atol, conlim)
+		st += 'btol = %8.2e			   iter_lim = %8g\n' % (btol, iter_lim)
+		print(st)
+		if output_collector is not None:
+			output_collector(st)
 
 	itn = 0
 	istop = 0
@@ -299,6 +299,16 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 	cs2 = -1
 	sn2 = 0
 
+	timings = dict()
+	def do_time(fun, timings, key):
+		def funtime(*args, **kwargs):
+			timings[key] = -time.time()
+			re = fun(*args, **kwargs)
+			timings[key] += time.time()
+			return re
+		return funtime
+	timing = -time.time()
+
 	"""
 	Set up the first vectors u and v for the bidiagonalization.
 	These satisfy  beta*u = b,  alfa*v = A'u.
@@ -312,7 +322,7 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 
 	if beta > 0:
 		u = (1/beta) * u
-		v = A.rmatvec(u)
+		v = do_time(A.rmatvec, timings, 'trm')(u)
 		alfa = np.linalg.norm(v)
 
 	if alfa > 0:
@@ -331,25 +341,25 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 	arnorm = alfa * beta
 	if arnorm == 0:
 		print(msg[0])
+		if output_collector is not None:
+			output_collector(msg[0])
 		return x, istop, itn, r1norm, r2norm, anorm, acond, arnorm, xnorm, var
 
-	head1 = '   Itn	  x[0]	   r1norm	 r2norm '
-	head2 = ' Compatible	LS	  Norm A   Cond A'
-
+	timing += time.time()
 	if show:
-		print(' ')
-		print(head1, head2)
+		st = ("{:>4s}"+"{:^16s}"*10+"\n").format('Itn', 'mean(x)','r1norm','r2norm','Compatible','LS','Norm A','Cond A','t_rmatvec','t_matvec','t_iteration')
 		test1 = 1
 		test2 = alfa / beta
-		str1 = '%6g %12.5e' % (itn, x[0])
-		str2 = ' %10.3e %10.3e' % (r1norm, r2norm)
-		str3 = '  %8.1e %8.1e' % (test1, test2)
-		print(str1, str2, str3)
+		st += ("{:>4d}"+"{:^ 16e}"*10+"\n").format(itn, np.linalg.norm(x), r1norm, r2norm, test1, test2, anorm, acond, timings['trm'], 0, timing)
+		print(st, end='')
+		if output_collector is not None:
+			output_collector(st)
 
 	ires = []
 
 	# Main iteration loop.
 	while itn < iter_lim:
+		timing = -time.time()
 		itn = itn + 1
 		"""
 		%	 Perform the next step of the bidiagonalization to obtain the
@@ -358,21 +368,19 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		%				alfa*v  =  A'*u  -  beta*v.
 		"""
 		tm = -time.time()
-		u = numexpr.evaluate("Amv-alfa*u", local_dict=dict(Amv=A.matvec(v), alfa=alfa, u=u)).astype(u.dtype)
+		u = numexpr.evaluate("Amv-alfa*u", local_dict=dict(Amv=do_time(A.matvec, timings, 'tm')(v), alfa=alfa, u=u)).astype(u.dtype)
 		tm += time.time()
 		beta = np.linalg.norm(u)
 
 		if beta > 0:
 			u = (1/beta) * u
 			anorm = sqrt(anorm**2 + alfa**2 + beta**2 + damp**2)
-			trm = -time.time()
-			v = numexpr.evaluate("Aru-beta*v", local_dict=dict(Aru=A.rmatvec(u), beta=beta, v=v)).astype(u.dtype)
-			trm += time.time()
+			v = numexpr.evaluate("Aru-beta*v", local_dict=dict(Aru=do_time(A.rmatvec, timings, 'trm')(u), beta=beta, v=v)).astype(u.dtype)
 			alfa = np.linalg.norm(v)
 			if alfa > 0:
 				v = (1 / alfa) * v
 		else:
-			trm = -1
+			timings['trm'] = -1
 
 		# Use a plane rotation to eliminate the damping parameter.
 		# This alters the diagonal (rhobar) of the lower-bidiagonal matrix.
@@ -495,13 +503,14 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 		# if istop != 0:
 		# 	prnt = True
 
+		timing += time.time()
+
 		if show and (itn%show==0 or itn==(n-1)):
-			str1 = '%6g %12.5e' % (itn, x[0])
-			str2 = ' %10.3e %10.3e' % (r1norm, r2norm)
-			str3 = '  %8.1e %8.1e' % (test1, test2)
-			str4 = ' %8.1e %8.1e' % (anorm, acond)
-			print(str1, str2, str3, str4, "{:e} {:e}".format(tm,trm))
-			if showfun!=None:
+			st = ("{:>4d}"+"{:^ 16e}"*10+"\n").format(itn, np.linalg.norm(x), r1norm, r2norm, test1, test2, anorm, acond, timings['tm'], timings['trm'], timing)
+			print(st, end='')
+			if output_collector is not None:
+				output_collector(st)
+			if showfun is not None:
 				showfun(x)
 
 		if istop != 0:
@@ -512,17 +521,11 @@ def lsqr(A, b, damp=0.0, atol=1e-8, btol=1e-8, conlim=1e8,
 	# End of iteration loop.
 	# Print the stopping condition.
 	if show:
-		print(' ')
-		print('LSQR finished')
-		print(msg[istop])
-		print(' ')
-		str1 = 'istop =%8g   r1norm =%8.1e' % (istop, r1norm)
-		str2 = 'anorm =%8.1e   arnorm =%8.1e' % (anorm, arnorm)
-		str3 = 'itn   =%8g   r2norm =%8.1e' % (itn, r2norm)
-		str4 = 'acond =%8.1e   xnorm  =%8.1e' % (acond, xnorm)
-		print(str1 + '   ' + str2)
-		print(str3 + '   ' + str4)
-		print(' ')
+		st = "\nLSQR finished\n"+msg[istop]+"\n\n"
+		st += "istop ={:8d}\tr1norm ={:8.1e}\tanorm ={:8.1e}\narnorm ={:8.1e}\titn ={:8d}\tr2norm ={:8.1e}\tacond ={:8.1e}\txnorm ={:8.1e}\n\n".format(istop, r1norm, anorm, arnorm, itn, r2norm, acond, xnorm)
+		print(st, end='')
+		if output_collector is not None:
+			output_collector(st)
 		
 	if interm_results is not None and interm_results_sink is None:
 		return x, ires, istop, itn, r1norm, r2norm, anorm, acond, arnorm, xnorm, var

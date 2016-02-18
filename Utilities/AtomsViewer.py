@@ -1,11 +1,13 @@
-import numpy
-
 # -*- coding: utf-8 -*-
 # vispy: gallery 30
 # -----------------------------------------------------------------------------
 # 2014, Aurore Deschildre, Gael Goret, Cyrille Rossant, Nicolas P. Rougier.
 # Distributed under the terms of the new BSD License.
 # -----------------------------------------------------------------------------
+# 2016 Jonas Krehl numerous changes
+#------------------------------------------------------------------------------
+import numpy
+
 from vispy import gloo
 from vispy import app
 from vispy.util.transforms import perspective, translate, rotate, ortho, scale

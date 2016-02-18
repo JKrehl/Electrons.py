@@ -14,6 +14,7 @@ Michael Saunders                saunders@stanford.edu
 Systems Optimization Laboratory
 Dept of MS&E, Stanford University.
 
+Modified for better output options by Jonas Krehl in 2015.
 """
 
 from __future__ import division, print_function, absolute_import
