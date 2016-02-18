@@ -12,6 +12,9 @@ from ...Utilities import Magic
 from ...Mathematics import FourierTransforms as FT
 from ...Mathematics import Interpolator2D
 
+from ...Utilities.Magic import humanize_filesize
+
+
 from .Kernel import Kernel
 
 import gc
@@ -53,6 +56,8 @@ class FresnelKernel(Kernel):
 		self.k, self.bandlimit, self.focus, self.mask = k, bandlimit, focus, mask
 		self.dtype, self.itype = dtype, itype
 		self.ss_w, self.ss_v, self.ss_u, self.cutoff = ss_w, ss_v, ss_u, cutoff
+
+		self._estimate_size_only = False
 
 		return self
 
@@ -111,8 +116,10 @@ class FresnelKernel(Kernel):
 		for i in range(prop.shape[1]):
 			prop[:, i, :] = numpy.roll(FT.mifft(propf[:, i, :]), (self.ss_w//2), 0).reshape(w.size, self.ss_w, u_ss.size).mean(1)
 
-		sel_rho_max = numexpr.evaluate("sqrt(-2*bl**2*z**2/dz**2+2*z**2/(k*dz**2)*sqrt(bl**4*k**2+dp**2*dz**2))", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=v_ss, dp=numpy.pi))
+		sel_rho_max = numexpr.evaluate("sqrt(-2*bl**2*z**2/dz**2+2*z**2/(k*dz**2)*sqrt(bl**4*k**2+dp**2*dz**2))", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=v_ss, dp=2*numpy.pi))
+		#sel_rho_max = numexpr.evaluate("z*bl/dz*(1+sqrt(1+2*dp*dz/(k*bl**2)))", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=v_ss, dp=2*numpy.pi))
 		prop = numexpr.evaluate('where(ww+uu<=rr_max+dww+duu, prop, 0)', local_dict=dict(prop=prop, ww=w[:, None, None]**2, dww=dw**2/4, uu=u_ss[None,None,:]**2, duu=du**2/4,rr_max=sel_rho_max[None, :, None]**2))
+		prop /= numpy.mean(prop, (0,2))[None,:,None]
 
 		del propf#, kr, rr, res_win
 		
@@ -151,10 +158,15 @@ class FresnelKernel(Kernel):
 
 		bounds = []
 
+		if self._estimate_size_only:
+			t_sel = numpy.s_[:1]
+		else:
+			t_sel = numpy.s_[:]
+
 		for iz, zi in Progress(enumerate(w_i_sh), w_i_sh.size, True):
 			entries = 0
 			
-			for it, ti in Progress(enumerate(self.t), self.t.size):
+			for it, ti in Progress(enumerate(self.t[t_sel]), self.t.size):
 				v,u = vus[it]
 				
 				propi = prop[iz, :, :]
@@ -210,3 +222,12 @@ class FresnelKernel(Kernel):
 		del col_concatenator
 		
 		return self
+
+	def estimate_size(self):
+		proto = FresnelKernel(memory_strategy=0).init(self.z, self.y, self.x, self.t, self.d, self.k, self.focus, self.bandlimit, self.mask, self.dtype, self.itype, self.ss_w, self.ss_v, self.ss_u, self.cutoff)
+		proto._estimate_size_only = True
+		proto.calc()
+
+		size = (proto.row.nbytes+proto.col.nbytes+proto.dat.nbytes)*proto.t.size
+
+		print("estimated size of tensor: {:>8g}{:s}".format(*humanize_filesize(size)))
