@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from . import Physics
 from .SlicePlayer import SlicePlayer
-from .Progress import Progress, FlProgress
+from .Progress import Progress
 from .Colourmap import SymNorm
 from . import Magic
 from . import CompressedSparse
