@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from . import FourierTransforms
 from . import CoordinateTrafos
 from . import VolumeTrafos

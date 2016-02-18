@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from . import Physics
 from .SlicePlayer import SlicePlayer
 from .Progress import Progress

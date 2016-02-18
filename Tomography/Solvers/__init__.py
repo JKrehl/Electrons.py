@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from .lsqr import lsqr
 from .lsmr import lsmr
 

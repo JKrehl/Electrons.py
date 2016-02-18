@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from .Multislice import Multislice
 from .Projection import Projection
 from .SingleScattering import SingleScattering

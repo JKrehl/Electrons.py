@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Copyright (C) 2010 David Fong and Michael Saunders
 
@@ -16,9 +17,6 @@ Dept of MS&E, Stanford University.
 
 Modified for better output options by Jonas Krehl in 2015.
 """
-
-from __future__ import division, print_function, absolute_import
-
 __all__ = ['lsmr']
 
 from numpy import zeros, infty

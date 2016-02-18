@@ -1,4 +1,3 @@
-
 from .Kernel import Kernel
 
 from .RayKernel import RayKernel

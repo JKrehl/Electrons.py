@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
 # vispy: gallery 30
 # -----------------------------------------------------------------------------
 # 2014, Aurore Deschildre, Gael Goret, Cyrille Rossant, Nicolas P. Rougier.

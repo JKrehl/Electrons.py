@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from . import Scattering
 from . import Tomography
 from . import Utilities

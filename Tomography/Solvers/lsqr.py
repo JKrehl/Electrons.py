@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Sparse Equations and Least Squares.
 
 The original Fortran code was written by C. C. Paige and M. A. Saunders as
@@ -50,9 +51,6 @@ Adapted for SciPy by Stefan van der Walt.
 It was further modified in 2015 by Jonas Krehl, incorporating numexpr and 
 and enhancing the output options.
 """
-
-from __future__ import division, print_function, absolute_import
-
 __all__ = ['lsqr']
 
 import numpy as np

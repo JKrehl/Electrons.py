@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from . import Solvers
 from . import Projectors
 from . import Kernels
