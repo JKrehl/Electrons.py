@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division
-
 import numpy
 import numexpr
 from scipy import ndimage
@@ -21,7 +19,7 @@ class FresnelFourier(IntervalOperator):
 			self.kk = numpy.add.outer(ky**2, kx**2)
 		
 	def apply(self, wave):
-		return FT.ifft(numexpr.evaluate('wave_f*exp(-1j*pi*dis/wn*kk)', local_dict={'wave_f':FT.fft(wave), 'pi':numpy.pi, 'dis':self.zf-self.zi, 'wn':self.k, 'kk':self.kk}))
+		return FT.ifft(numexpr.evaluate('wave_f*exp(-1j*dis/(2*wn)*kk)', local_dict={'wave_f':FT.fft(wave), 'pi':numpy.pi, 'dis':self.zf-self.zi, 'wn':self.k, 'kk':self.kk}))
 
 	def split(self, z):
 		return FresnelFourier(self.zi, z, self.k, self.kk), FresnelFourier(z, self.zf, self.k, self.kk)

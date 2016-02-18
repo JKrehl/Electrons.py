@@ -27,7 +27,7 @@ class FresnelFourierPadded(IntervalOperator):
 		scl = tuple(i/j for i,j in zip(self.kk.shape, pshape))
 		depad = tuple(slice(i,-i) for i in pad)
 		win = numpy.multiply.reduce(numpy.ix_(*tuple(numpy.hamming(i) for i in wave.shape)))
-		return FT.ifft(numexpr.evaluate('wave_f*exp(-1j*pi*dis/wn*kk)', local_dict={'wave_f':FT.fft(numpy.pad(wave*win,pad,mode='constant')), 'pi':numpy.pi, 'dis':self.zf-self.zi, 'wn':self.k,
+		return FT.ifft(numexpr.evaluate('wave_f*exp(-1j*dis/(2*wn)*kk)', local_dict={'wave_f':FT.fft(numpy.pad(wave*win,pad,mode='constant')), 'pi':numpy.pi, 'dis':self.zf-self.zi, 'wn':self.k,
 																					'kk':ndimage.interpolation.affine_transform(self.kk,scl,output_shape=pshape)}))[depad]/win
 
 	def split(self, z):

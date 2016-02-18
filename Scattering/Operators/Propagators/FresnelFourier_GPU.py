@@ -112,7 +112,7 @@ class FresnelFourier_GPU(IntervalOperator):
 		if tmp is None or not hasattr(tmp, 'thread') or tmp.thread != self.thread:
 			tmp = self.thread.array(wave.shape, wave.dtype, wave.strides)
 		
-		factor = -1j*numpy.pi*(self.zf-self.zi)/self.k
+		factor = -1j*(self.zf-self.zi)/(2*self.k)
 
 		psignature = (self.thread, reikna.core.Type.from_value(wave).__repr__(), reikna.core.Type.from_value(self.kk).__repr__(), reikna.core.Type.from_value(factor).__repr__())
 
