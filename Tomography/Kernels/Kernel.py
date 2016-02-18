@@ -192,9 +192,9 @@ class ArrayDataset(Item):
 		def append(self, value):
 			assert value.shape[1:] == self.shape[1:]
 			if value.shape[0]!=0:
-				with self.parent.open():
-					self.dataset.resize(self.dataset.shape[0]+value.shape[0], axis=0)
-					self.dataset[-value.shape[0]:,...] = value.astype(self.dataset.dtype, copy=False)
+				with self.parent.parent.open():
+					self.parent.dataset.resize(self.parent.dataset.shape[0]+value.shape[0], axis=0)
+					self.parent.dataset[-value.shape[0]:,...] = value.astype(self.parent.dataset.dtype, copy=False)
 
 		def finalize(self):
 			pass
@@ -344,7 +344,6 @@ class Kernel(object):
 		for cm in cms: cm.__enter__()
 		yield
 		for cm in cms: cm.__exit__(None, None, None)
-		print(cms)
 
 	def __getattr__(self, name):
 		if name!='_arrays' and name in self._arrays:
