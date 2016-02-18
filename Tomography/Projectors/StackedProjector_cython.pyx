@@ -12,8 +12,8 @@ def matvec(
 		itype[:] col,
 		itype[:] row,
 		itype stack_height,
-		itype row_stride,
 		itype col_stride,
+		itype row_stride,
 		int threads=0):
 	
 	cdef itype tensor_length = dat.size
