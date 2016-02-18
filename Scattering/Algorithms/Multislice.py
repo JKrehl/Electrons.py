@@ -51,7 +51,7 @@ class Multislice:
 		self.kk = numpy.add.outer(self.ky**2, self.kx**2)
 		
 		i = 0
-		slice_thickness = Physics.wavenumber(self.energy)/(4*max(numpy.pi/(self.y[1]-self.y[0]), numpy.pi/(self.x[1]-self.x[0]))**2)
+		slice_thickness = numpy.pi/20*2*Physics.wavenumber(self.energy)/(max(numpy.pi/(self.y[1]-self.y[0]), numpy.pi/(self.x[1]-self.x[0]))**2)
 		while i<self.potential.atoms.size:
 			j = i+1
 			zi = self.potential.atoms['zyx'][i,0]
