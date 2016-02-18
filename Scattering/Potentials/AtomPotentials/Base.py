@@ -41,3 +41,7 @@ class AtomPotential:
 	@classmethod
 	def phaseshift_f(cls, Z, energy, y, x, z=None):
 		return FT.fft(cls.phaseshift(Z, energy, y, x, z))
+
+	@classmethod
+	def cis_phaseshift_f(cls, Z, energy, y, x, z=None):
+		return FT.fft(numpy.exp(1j*cls.phaseshift(Z, energy, y, x, z)))

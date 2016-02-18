@@ -1,12 +1,11 @@
- 
-from __future__ import division, print_function
-
 import numpy
 import numexpr
 import scipy.interpolate
 
 from ....Mathematics import FourierTransforms as FT
 from ...Potentials.AtomPotentials import WeickenmeierKohl
+
+import gc
 
 from ..Base import PlaneOperator
 
@@ -23,10 +22,9 @@ class FlatAtomDW(PlaneOperator):
 								  dtype=dtype,
 								  lazy=lazy, forgetful=forgetful))
 
-		self.phaseshifts_f = None
 		self.transfer_function = None
 		if not self.lazy:
-			self.generate_tf()
+			self.transfer_function = self.generate_tf()
 
 		self.z = numpy.mean(self.atoms['zyx'][:,0])
 
@@ -48,16 +46,18 @@ class FlatAtomDW(PlaneOperator):
 					args['atom_potential_generator'] = parent.atom_potential_generator
 				if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
 					args['phaseshifts_f'] = {}
-				args['phaseshifts_f'].update({i: args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['y'], args['x']) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
-				
+				args['phaseshifts_f'].update({i: args['atom_potential_generator'].cis_phaseshift_f(i, args['energy'], args['y'], args['x']) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
+
 		parent.transfer_function_args.update(args)
 
 		return cls(atoms, **args)
 			
 	def generate_tf(self):
-		
+
 		if self.phaseshifts_f is None:
-			self.phaseshifts_f = {i: self.atom_potential_generator.phaseshift_f(i, self.energy, self.y, self.x) for i in numpy.unique(self.atoms['Z'])}
+			phaseshifts_f = {i: self.atom_potential_generator.cis_phaseshift_f(i, self.energy, self.y, self.x) for i in numpy.unique(self.atoms['Z'])}
+		else:
+			phaseshifts_f = self.phaseshifts_f
 
 		if self.ky is None:
 			ky = FT.reciprocal_coords(self.y)
@@ -78,17 +78,19 @@ class FlatAtomDW(PlaneOperator):
 
 		for a in self.atoms:
 			tf += numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
-								   local_dict={'ps':self.phaseshifts_f[a['Z']],
+								   local_dict={'ps':phaseshifts_f[a['Z']],
 											   'ys':a['zyx'][1], 'xs':a['zyx'][2],
 											   'ky':ky[:,None], 'kx':kx[None,:],
 											   'kk':kk, 'B':a['B']})
 
-		self.transfer_function = numpy.exp(1j*FT.ifft(tf))
+		return FT.ifft(tf)
 
 	def apply(self, wave):
 		if self.transfer_function is None:
-			self.generate_tf()
-		res = numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transfer_function, wave=wave))
+			self.transfer_function = self.generate_tf()
+
+		numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transfer_function, wave=wave), out=wave)
+
 		if self.forgetful:
 			self.transfer_function = None
-		return res
+		return wave

@@ -149,7 +149,7 @@ class FlatAtomDW_GPU(PlaneOperator):
 					args['atom_potential_generator'] = parent.atom_potential_generator
 				if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
 					args['phaseshifts_f'] = {}
-				args['phaseshifts_f'].update({i: thread.to_device(args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['y'], args['x'])) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
+				args['phaseshifts_f'].update({i: thread.to_device(args['atom_potential_generator'].cis_phaseshift_f(i, args['energy'], args['y'], args['x'])) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 
 		parent.transfer_function_args.update(args)
 		return cls(atoms, **args)
@@ -157,7 +157,7 @@ class FlatAtomDW_GPU(PlaneOperator):
 	def generate_tf(self):
 		
 		if self.phaseshifts_f is None:
-			phaseshifts_f = {i: self.thread.to_device(self.atom_potential_generator.phaseshift_f(i, self.energy, self.y, self.x)) for i in numpy.unique(self.atoms['Z'])}
+			phaseshifts_f = {i: self.thread.to_device(self.atom_potential_generator.cis_phaseshift_f(i, self.energy, self.y, self.x)) for i in numpy.unique(self.atoms['Z'])}
 		else:
 			phaseshifts_f = self.phaseshifts_f
 			
@@ -185,7 +185,6 @@ class FlatAtomDW_GPU(PlaneOperator):
 
 			
 		tf = self.thread.array(kk.shape, self.dtype)
-		tf[...] = 0
 
 		sign = (self.thread,
 				reikna.core.Type.from_value(tf).__repr__(),
@@ -222,9 +221,8 @@ class FlatAtomDW_GPU(PlaneOperator):
 			
 		tmp = self.thread.temp_array(tf.shape, tf.dtype, tf.strides)
 		fft_gpu(tmp, tf, 1)
-		expi(tf, tmp)
 	
-		self.transfer_function = tf
+		self.transfer_function = tmp
 
 	def apply(self, wave):
 		if not hasattr(wave, 'thread') or wave.thread != self.thread:
@@ -232,7 +230,9 @@ class FlatAtomDW_GPU(PlaneOperator):
 		
 		if self.transfer_function is None:
 			self.generate_tf()
-		
+
+		print(type(wave))
+		print(type(self.transfer_function))
 		wave *= self.transfer_function
 		
 		if self.forgetful:

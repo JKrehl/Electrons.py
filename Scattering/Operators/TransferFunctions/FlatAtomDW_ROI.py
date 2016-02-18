@@ -1,6 +1,3 @@
- 
-from __future__ import division, print_function
-
 import numpy
 import numexpr
 import scipy.interpolate
@@ -103,7 +100,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 		dx = self.x[1]-self.x[0]
 		
 		if self.roi_y is None:
-			roi_yl = -numpy.ceil(self.roi/dy)
+			roi_yl = -numpy.ceil(self.roi/dy)-1
 			roi_yu = numpy.ceil(self.roi/dy)+1
 			roi_y = dy*numpy.arange(roi_yl, roi_yu)
 		else:
@@ -112,7 +109,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 			roi_yu = (roi_y.size+1)//2
 			
 		if self.roi_x is None:
-			roi_xl = -numpy.ceil(self.roi/dx)
+			roi_xl = -numpy.ceil(self.roi/dx)-1
 			roi_xu = numpy.ceil(self.roi/dx)+1
 			roi_x = dx*numpy.arange(roi_xl, roi_xu)
 		else:
@@ -136,7 +133,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 			roi_kk = self.roi_kk
 			
 		if self.phaseshifts_f is None:
-			self.phaseshifts_f = {i: self.atom_potential_generator.phaseshift_f(i, self.energy, roi_y, roi_x) for i in numpy.unique(self.atoms['Z'])}
+			self.phaseshifts_f = {i: self.atom_potential_generator.cis_phaseshift_f(i, self.energy, roi_y, roi_x) for i in numpy.unique(self.atoms['Z'])}
 		
 		tf = numpy.ones(kk.shape, dtype=self.dtype)
 		itf = numpy.empty(roi_kk.shape, dtype=self.dtype)
@@ -145,12 +142,12 @@ class FlatAtomDW_ROI(PlaneOperator):
 			py, px = a['zyx'][1], a['zyx'][2]
 			rpy, ipy = numpy.modf((py-self.y[0])/dy)
 			rpx, ipx = numpy.modf((px-self.x[0])/dx)
-			
+
 			select = numpy.s_[ipy+roi_yl if ipy+roi_yl>=0 else 0:ipy+roi_yu if ipy+roi_yu<=self.y.size else self.y.size,
 							  ipx+roi_xl if ipx+roi_xl>=0 else 0:ipx+roi_xu if ipx+roi_xu<=self.x.size else self.x.size]
 
-			iselect = numpy.s_[0 if ipy+roi_yl>0 else ipy+roi_yl: roi_y.size if ipy+roi_yu<self.y.size else self.y.size-ipy-roi_yu,
-							   0 if ipx+roi_xl>0 else ipx+roi_xl: roi_x.size if ipx+roi_xu<self.x.size else self.x.size-ipx-roi_xu]
+			iselect = numpy.s_[0 if ipy+roi_yl>=0 else -(ipy+roi_yl): roi_y.size if ipy+roi_yu<=self.y.size else self.y.size+self.roi_y.size-ipy-roi_yu,
+							   0 if ipx+roi_xl>=0 else -(ipx+roi_xl): roi_x.size if ipx+roi_xu<=self.x.size else self.x.size+self.roi_x.size-ipx-roi_xu]
 
 			itf = numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
 								   local_dict={'ps':self.phaseshifts_f[a['Z']],
@@ -158,8 +155,8 @@ class FlatAtomDW_ROI(PlaneOperator):
 											   'ky':roi_ky[:,None], 'kx':roi_kx[None,:],
 											   'kk':roi_kk, 'B':a['B']})
 
-			tf[select] *= numpy.exp(1j*FT.ifft(itf))[iselect]
-		self.transfer_function =tf
+			tf[select] *= FT.ifft(itf)[iselect]
+		self.transfer_function = tf
 
 	def apply(self, wave):
 		if self.transfer_function is None:
