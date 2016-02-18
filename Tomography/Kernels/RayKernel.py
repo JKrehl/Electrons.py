@@ -64,7 +64,7 @@ class RayKernel(Kernel):
 		return (self.y/yd, self.x/xd, self.d/dd, yd*xd/dd, mask)
 
 	def calc_one_angle(self, ti, y, x, d, unit_area, mask):
-		al = abs((ti+numpy.pi/4)%(numpy.pi/2) - numpy.pi/4)
+		al = abs((-ti+numpy.pi/4)%(numpy.pi/2) - numpy.pi/4)
 		a = .5*(numpy.cos(al)-numpy.sin(al))
 		b = .5*(numpy.cos(al)+numpy.sin(al))
 		h = 1/numpy.cos(al)
@@ -72,7 +72,7 @@ class RayKernel(Kernel):
 		if b==a: f = 0
 		else: f = h/(b-a)
 
-		e = numexpr.evaluate("x*cos(t)-y*sin(t) -d", local_dict=dict(x=x[None,None,:], y=y[None,:,None], d=d[:,None,None], t=ti)).reshape(d.size, y.size*x.size)
+		e = numexpr.evaluate("x*cos(t)+y*sin(t) -d", local_dict=dict(x=x[None,None,:], y=y[None,:,None], d=d[:,None,None], t=ti)).reshape(d.size, y.size*x.size)
 		if mask is not None:
 			sel = numexpr.evaluate("mask&(abs(e)<(b+.5))", local_dict=dict(mask=mask[None,:], e=e, b=b))
 		else:
@@ -92,14 +92,14 @@ class RayKernel(Kernel):
 		return (ker[csel], dsel, yxsel)
 
 
-	def calc(self, track_progress=False):
+	def calc(self, progress=False):
 		y, x, d, unit_area, mask = self.prep()
 
 		dat_concatenator = self.arrays.dat.concatenator(self.dtype)
 		row_concatenator = self.arrays.row.concatenator(self.itype)
 		col_concatenator = self.arrays.col.concatenator(self.itype)
 
-		for it,ti in apply_if(enumerate(self.t), Progress, track_progress, length=self.t.size):
+		for it,ti in apply_if(enumerate(self.t), Progress, progress, length=self.t.size):
 			idat, irow, icol = self.calc_one_angle(ti, y, x, d, unit_area, mask)
 
 			dat_concatenator.append(idat)
