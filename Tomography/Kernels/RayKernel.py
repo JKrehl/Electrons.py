@@ -132,23 +132,3 @@ class RayKernel(Kernel):
 		del col_concatenator
 
 		return self
-
-class RayKernelCS(RayKernel):
-	def __init__(self, y, x, t, d, mask=None, dtype=numpy.float64, itype=numpy.int32, memory_strategy=0, path=None):
-		self._arrays = dict(Tdat=1, Trow=1, Tcol=1)
-		super().__init__(y, x, t, d, mask=mask, dtype=dtype, itype=itype, memory_strategy=memory_strategy, path=path)
-
-	def calc(self, track_progress=False):
-		super().calc(track_progress)
-
-		with self.open():
-			dat = self.dat[...]
-			row = self.row[...]
-			col = self.col[...]
-
-		self.row, self.dat, self.col = CS.compress_sparse(row, self.fshape[0], dat, col)
-		self.Trow, self.Tdat, self.Tcol = CS.compress_sparse(col, self.fshape[1], dat, row)
-
-		del dat, row, col
-
-		return self
