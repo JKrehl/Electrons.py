@@ -1,5 +1,4 @@
 ## Scripts and programs for TEM scattering simulation and tomographic reconstruction.
----
 
 The code is oriented towards maximum extensivity and reusability. A lot of concepts are implemented as relatively powerful meta-concepts with explicit implementations (which inherit a lot of the meta-concepts functionalities). 
 
