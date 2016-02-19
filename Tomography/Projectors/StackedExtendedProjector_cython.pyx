@@ -31,27 +31,27 @@ cdef extern from "StackedExtendedProjector_cpp.cpp" nogil:
 DTYPES = (numpy.float32, numpy.float64, numpy.complex64, numpy.complex128)
 ITYPES = (numpy.int16, numpy.int32, numpy.int64, numpy.uint16, numpy.uint32, numpy.uint64)
 
-def matvec2(
-		numpy.ndarray vec,
-		numpy.ndarray res,
-		numpy.npy_intp zsize,
-		numpy.ndarray dz,
-		numpy.ndarray bounds,
-		numpy.ndarray col,
-		numpy.ndarray row,
-		numpy.ndarray coeff,
-		int threads=0):
-
-	assert res.dtype==vec.dtype and coeff.dtype==vec.dtype, "all data-containing arrays should have the same Datatype: vec: %s, res: %s, coeff: %s"%(res.dtype, vec.dtype, coeff.dtype)
-	assert res.dtype in DTYPES, "type of data-arrays not acceptable: %s"%res.dtype
-
-	assert dz.dtype==bounds.dtype and dz.dtype==col.dtype and dz.dtype==row.dtype, "all indices-containing arrays should have the same Datatype: idz: %s, bounds: %s, col: %s, row: %s"%(dz.dtype, bounds.dtype, col.dtype, row.dtype)
-	assert dz.dtype in ITYPES, "type of indices-arrays not acceptable: %s"%dz.dtype
-
-	if threads==0:
-		threads = openmp.omp_get_max_threads()
-
-	sparse_matvec(vec, res, zsize, dz, bounds, col, row, coeff, threads)
+# def matvec(
+# 		numpy.ndarray vec,
+# 		numpy.ndarray res,
+# 		numpy.npy_intp zsize,
+# 		numpy.ndarray dz,
+# 		numpy.ndarray bounds,
+# 		numpy.ndarray col,
+# 		numpy.ndarray row,
+# 		numpy.ndarray coeff,
+# 		int threads=0):
+#
+# 	assert res.dtype==vec.dtype and coeff.dtype==vec.dtype, "all data-containing arrays should have the same Datatype: vec: %s, res: %s, coeff: %s"%(res.dtype, vec.dtype, coeff.dtype)
+# 	assert res.dtype in DTYPES, "type of data-arrays not acceptable: %s"%res.dtype
+#
+# 	assert dz.dtype==bounds.dtype and dz.dtype==col.dtype and dz.dtype==row.dtype, "all indices-containing arrays should have the same Datatype: idz: %s, bounds: %s, col: %s, row: %s"%(dz.dtype, bounds.dtype, col.dtype, row.dtype)
+# 	assert dz.dtype in ITYPES, "type of indices-arrays not acceptable: %s"%dz.dtype
+#
+# 	if threads==0:
+# 		threads = openmp.omp_get_max_threads()
+#
+# 	sparse_matvec(vec, res, zsize, dz, bounds, col, row, coeff, threads)
 
 def matvec(
 		numpy.ndarray[dtype, ndim=1] vec,
