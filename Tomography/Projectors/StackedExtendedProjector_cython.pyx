@@ -64,11 +64,9 @@ def matvec(
 		numpy.ndarray[dtype, ndim=1] coeff,
 		int threads=0):
 
+	cdef itype idz_size = dz.size
 	cdef itype col_stride = numpy.round(vec.size/zsize)
 	cdef itype row_stride = numpy.round(res.size/zsize)
-	cdef itype i,j,k
-
-	cdef itype idzlen = len(dz)
 
 	cdef dtype* vec_view
 	cdef dtype* res_view
@@ -79,12 +77,15 @@ def matvec(
 	if threads==0:
 		threads = openmp.omp_get_max_threads()
 
+	cdef itype i,j,jz,k
+
 	with nogil, parallel(num_threads=threads):
 		for i in prange(zsize, schedule='guided'):
 			res_view = &res[i*row_stride]
-			for j in range(idzlen):
-				if (i+dz[j])<zsize and (i+dz[j])>=0 and bounds[j+1]>bounds[j]:
-					vec_view = &vec[(i+dz[j])*col_stride]
+			for j in range(idz_size):
+				jz = i+dz[j]
+				if jz<zsize and jz>=0:
+					vec_view = &vec[jz*col_stride]
 					coeff_view = &coeff[bounds[j]]
 					idx_col_view = &col[bounds[j]]
 					idx_row_view = &row[bounds[j]]
