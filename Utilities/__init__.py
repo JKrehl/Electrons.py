@@ -5,6 +5,6 @@ from .Colourmap import SymNorm
 from . import Magic
 from . import CompressedSparse
 from .AtomsViewer import AtomsViewer
-
+from .ImExport import imexport
 
 __all__ = [s for s in dir() if not s.startswith('_')]
