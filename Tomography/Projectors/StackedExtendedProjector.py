@@ -62,8 +62,11 @@ class StackedExtendedProjector(scipy.sparse.linalg.LinearOperator):
 		v = v.reshape(self.shape[0])
 
 		u = numpy.zeros(self.shape[1], self.dtype)
-		
+
+		numpy.conj(u,u)
+		numpy.conj(v,v)
 		with self.in_memory():
 			cython.matvec(v,u, self.z.size, -self.kernel.idz, self.kernel.bounds, self.kernel.row, self.kernel.col, self.kernel.dat, self.threads)
+		numpy.conj(v,v)
 
 		return u

@@ -60,7 +60,10 @@ class FlatProjector(scipy.sparse.linalg.LinearOperator):
 		v = v.reshape(self.shape[0])
 		u = numpy.zeros(self.shape[1], self.dtype)
 
+		numpy.conj(v,v)
 		with self.in_memory():
 			cython.matvec(v, u, self.kernel.dat, self.kernel.col, self.kernel.row)
+		numpy.conj(u,u)
+		numpy.conj(v,v)
 
 		return u
