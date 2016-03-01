@@ -85,14 +85,14 @@ class FresnelKernel(Kernel):
 	def fshape(self):
 		return (self.idz.size*self.t.size*self.d.size, self.idz.size*self.y.size*self.x.size)
 
-	def calc(self):
+	def calc_prop(self):
 		dw = self.z[1]-self.z[0]
 		dv = min(self.y[1]-self.y[0],self.x[1]-self.x[0])
 		du = dv
 
 		if self.bandlimit==0:
 			self.bandlimit = max(dw, dv)
-		
+
 		vus = []
 		v_min = numpy.inf
 		v_max = -numpy.inf
@@ -106,13 +106,13 @@ class FresnelKernel(Kernel):
 			v_max = max(v_max, numpy.amax(v))
 			vus.append((v,u))
 
-		rho_max = numexpr.evaluate("sqrt(-2*bl**2*z**2/dz**2+2*z**2/(k*dz**2)*sqrt(bl**4*k**2+dp**2*dz**2))", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=max(-v_min, v_max), dp=4*numpy.pi))
+		rho_max = 2*numexpr.evaluate("dp*z/(k*bl)+bl", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=max(-v_min, v_max), dp=2*numpy.pi))
 
 		w_i = numpy.arange(-int(numpy.ceil(rho_max/dw)), int(numpy.ceil(rho_max/dw)), dtype=self.itype)
 		w = dw*w_i
 		v = dv*numpy.arange(int(numpy.floor(v_min/dv)), int(numpy.ceil(v_max/dv)))
 		u = du*numpy.arange(-int(numpy.ceil(rho_max/du)), int(numpy.ceil(rho_max/du)))
-		
+
 		w_ss = supersample(w, dw, self.ss_w).flatten()
 		v_ss = supersample(v, dv, self.ss_v).flatten()
 		u_ss = supersample(u, du, self.ss_u).flatten()
@@ -120,41 +120,47 @@ class FresnelKernel(Kernel):
 		kw_ss = FT.mreciprocal_coords(w_ss)
 		ku_ss = FT.mreciprocal_coords(u_ss)
 
-		propf = numexpr.evaluate('1/(2*pi)*exp(1j*(-v/(2*k)*(kw**2+ku**2)))', local_dict=dict(j=1j, pi=numpy.pi, k=self.k, kw=kw_ss[:, None, None], v=v_ss[None, :, None], ku=ku_ss[None, None, :]))
+		propf = dv*numexpr.evaluate('exp(1j*(-v/(2*k)*(kw**2+ku**2)))', local_dict=dict(j=1j, pi=numpy.pi, k=self.k, kw=kw_ss[:, None, None], v=v_ss[None, :, None], ku=ku_ss[None, None, :]))
 
-		#kr = numexpr.evaluate("sqrt(kw**2+ku**2)*dr", local_dict=dict(kw=kw_ss[:,None], ku=ku_ss[None,:], dr=self.bandlimit, pi=numpy.pi))
-		#res_win = numexpr.evaluate('where(kr==0, 1, 2*j1kr/kr)', local_dict=dict(kr=kr, j1kr=scipy.special.j1(kr)))
-		#res_win /= numpy.mean(res_win)
-		
-		#propf = numexpr.evaluate("propf*res_win", local_dict=dict(propf=propf, res_win=res_win[:,None,:]))
+		kr = numexpr.evaluate("sqrt(kw**2+ku**2)*dr/2", local_dict=dict(kw=kw_ss[:,None], ku=ku_ss[None,:], dr=self.bandlimit, pi=numpy.pi))
+		res_win = numexpr.evaluate('where(kr==0, 1, 2*j1kr/kr)', local_dict=dict(kr=kr, j1kr=scipy.special.j1(kr)))
+		res_win /= numpy.mean(res_win)
+
+		propf = numexpr.evaluate("propf*res_win", local_dict=dict(propf=propf, res_win=res_win[:,None,:]))
 
 		prop = numpy.empty(w.shape + v_ss.shape + u_ss.shape, self.dtype)
 		for i in range(prop.shape[1]):
-			prop[:, i, :] = numpy.roll(FT.mifft(propf[:, i, :]), (self.ss_w//2), 0).reshape(w.size, self.ss_w, u_ss.size).mean(1)
+			prop[:, i, :] = numpy.roll(FT.mifft(propf[:, i, :]), (self.ss_w//2), 0).reshape(w.size, self.ss_w, u_ss.size)[:,0,:]#.mean(1)
 
-		sel_rho_max = numexpr.evaluate("sqrt(-2*bl**2*z**2/dz**2+2*z**2/(k*dz**2)*sqrt(bl**4*k**2+dp**2*dz**2))", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=v_ss, dp=2*numpy.pi))
+		sel_rho_max = numexpr.evaluate("dp*abs(z)/(k*bl)+bl", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=v_ss, dp=2*numpy.pi))
+		#sel_rho_max = numexpr.evaluate("sqrt(-2*bl**2*z**2/dz**2+2*z**2/(k*dz**2)*sqrt(bl**4*k**2+dp**2*dz**2))", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=v_ss, dp=2*numpy.pi))
 		#sel_rho_max = numexpr.evaluate("z*bl/dz*(1+sqrt(1+2*dp*dz/(k*bl**2)))", local_dict=dict(bl=self.bandlimit, k=self.k, dz=dv, z=v_ss, dp=2*numpy.pi))
-		prop = numexpr.evaluate('where(ww+uu<=rr_max+dww+duu, prop, 0)', local_dict=dict(prop=prop, ww=w[:, None, None]**2, dww=dw**2/4, uu=u_ss[None,None,:]**2, duu=du**2/4,rr_max=sel_rho_max[None, :, None]**2))
-		prop /= numpy.mean(prop, (0,2))[None,:,None]
+		prop = numexpr.evaluate('where(ww+uu<=rr_max, prop, 0)', local_dict=dict(prop=prop, ww=w[:, None, None]**2, dww=dw**2/4, uu=u_ss[None,None,:]**2, duu=du**2/4,rr_max=sel_rho_max[None, :, None]**2))
+		#prop /= numpy.linalg.norm(prop, (0,2))[None,:,None]
 
 		del propf#, kr, rr, res_win
-		
+
 		prop_max = numpy.amax(numpy.abs(prop))
-		prop_nz = numpy.abs(prop) >= self.cutoff*prop_max
+		prop_nz = numpy.abs(prop) >= self.cutoff*numpy.amax(numpy.abs(prop), (0,2))[None,:,None]
 
 		prop_shrink = numpy.array([[Magic.where_first(a), Magic.where_last(a)+1] for a in (numpy.any(prop_nz, axis=(1,2)), numpy.any(prop_nz, axis=(0,1)))])
 		prop_shrink[0] += [-1,+1]
 		prop_shrink[1] += [-self.ss_u, +self.ss_u]
-		
+
 		if prop_shrink[0,0] < 0: prop_shrink[0,0] = 0
 		if prop_shrink[1,0] < 0: prop_shrink[1,0] = 0
 		if prop_shrink[0,1] > prop_nz.shape[0]: prop_shrink[0,1] = prop_nz.shape[0]
 		if prop_shrink[1,1] > prop_nz.shape[2]: prop_shrink[1,1] = prop_nz.shape[2]
-		
+
 		prop = numpy.require(prop[prop_shrink[0,0]:prop_shrink[0,1], :, prop_shrink[1,0]:prop_shrink[1,1]], None, 'O')
 		w_i_sh = w_i[prop_shrink[0,0]:prop_shrink[0,1]]
 		w_sh = w[prop_shrink[0,0]:prop_shrink[0,1]]
 		u_ss_sh = u_ss[prop_shrink[1,0]:prop_shrink[1,1]]
+
+		return prop, w_i_sh, w_sh, u_ss_sh, vus, prop_max, v_ss
+
+	def calc(self):
+		prop, w_i_sh, w_sh, u_ss_sh, vus, prop_max, v_ss = self.calc_prop()
 
 		if self.mask:
 			mask = numpy.add.outer((numpy.arange(self.y.size)-self.y.size//2)**2,(numpy.arange(self.x.size)-self.x.size//2)**2).flatten()<(.25*min(self.y.size**2, self.x.size**2))
