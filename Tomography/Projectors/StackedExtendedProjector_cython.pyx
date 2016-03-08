@@ -91,4 +91,4 @@ def matvec(
 					idx_row_view = &row[bounds[j]]
 
 					for k in range(bounds[j+1]-bounds[j]):
-						atomic_add(&res_view[idx_row_view[k]], coeff_view[k]*vec_view[idx_col_view[k]])
+						res_view[idx_row_view[k]] += coeff_view[k]*vec_view[idx_col_view[k]]
