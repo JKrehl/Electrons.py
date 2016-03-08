@@ -120,7 +120,7 @@ class FresnelKernel(Kernel):
 		kw_ss = FT.mreciprocal_coords(w_ss)
 		ku_ss = FT.mreciprocal_coords(u_ss)
 
-		propf = dv*numexpr.evaluate('exp(1j*(-v/(2*k)*(kw**2+ku**2)))', local_dict=dict(j=1j, pi=numpy.pi, k=self.k, kw=kw_ss[:, None, None], v=v_ss[None, :, None], ku=ku_ss[None, None, :]))
+		propf = numexpr.evaluate('exp(1j*(-v/(2*k)*(kw**2+ku**2)))', local_dict=dict(j=1j, pi=numpy.pi, k=self.k, kw=kw_ss[:, None, None], v=v_ss[None, :, None], ku=ku_ss[None, None, :]))
 
 		kr = numexpr.evaluate("sqrt(kw**2+ku**2)*dr/2", local_dict=dict(kw=kw_ss[:,None], ku=ku_ss[None,:], dr=self.bandlimit, pi=numpy.pi))
 		res_win = numexpr.evaluate('where(kr==0, 1, 2*j1kr/kr)', local_dict=dict(kr=kr, j1kr=scipy.special.j1(kr)))
@@ -161,6 +161,8 @@ class FresnelKernel(Kernel):
 
 	def calc(self):
 		prop, w_i_sh, w_sh, u_ss_sh, vus, prop_max, v_ss = self.calc_prop()
+
+		unit_area = (self.y[1]-self.y[0])*(self.x[1]-self.x[0])/(self.d[1]-self.d[0])
 
 		if self.mask:
 			mask = numpy.add.outer((numpy.arange(self.y.size)-self.y.size//2)**2,(numpy.arange(self.x.size)-self.x.size//2)**2).flatten()<(.25*min(self.y.size**2, self.x.size**2))
@@ -211,7 +213,7 @@ class FresnelKernel(Kernel):
 						
 						psel = numpy.abs(dat) >= self.cutoff*prop_max
 
-						dat_concatenator.append(dat[psel])
+						dat_concatenator.append(unit_area*dat[psel])
 						row_concatenator.append(d_sel[psel] + it*self.d.size)
 						col_concatenator.append(yx_sel[psel])
 

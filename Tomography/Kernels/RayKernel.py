@@ -105,7 +105,7 @@ class RayKernel(Kernel):
 		dsel = dsel[csel]
 		yxsel = yxsel[csel]
 
-		return (ker[csel], dsel, yxsel)
+		return (ker[csel].astype(self.dtype), dsel, yxsel)
 
 
 	def calc(self, progress=False):
@@ -117,6 +117,9 @@ class RayKernel(Kernel):
 
 		for it,ti in apply_if(enumerate(self.t), Progress, progress, length=self.t.size):
 			idat, irow, icol = self.calc_one_angle(ti, y, x, d, unit_area, mask)
+
+			if numpy.issubdtype(self.dtype, numpy.complex):
+				idat *= -1j
 
 			dat_concatenator.append(idat)
 			row_concatenator.append(irow+self.d.size*it)
