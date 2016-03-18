@@ -376,7 +376,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 				
 			fft_gpu(tmp, itf, 0)
 			#tmp /= itf.size
-			expi(itf, tmp)
+			#expi(itf, tmp)
 				
 			select = numpy.s_[ipy+roi_yl if ipy+roi_yl>=0 else 0:ipy+roi_yu if ipy+roi_yu<=self.y.size else self.y.size,
 							  ipx+roi_xl if ipx+roi_xl>=0 else 0:ipx+roi_xu if ipx+roi_xu<=self.x.size else self.x.size]
