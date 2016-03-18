@@ -91,16 +91,16 @@ class FlatAtomDW(PlaneOperator):
 		else:
 			kk = self.kk
 
-		tf = numpy.zeros(kk.shape, dtype=self.dtype)
+		tf = numpy.ones(kk.shape, dtype=self.dtype)
 
 		for a in self.atoms:
-			tf += numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
+			tf *= FT.ifft(numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
 								   local_dict={'ps':phaseshifts_f[a['Z']],
 											   'ys':a['zyx'][1], 'xs':a['zyx'][2],
 											   'ky':ky[:,None], 'kx':kx[None,:],
-											   'kk':kk, 'B':a['B']})
+											   'kk':kk, 'B':a['B']}))
 
-		return FT.ifft(tf)
+		return tf
 
 	def apply(self, wave):
 		if self.transfer_function is None:

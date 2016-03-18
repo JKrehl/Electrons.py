@@ -240,7 +240,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 					args['atom_potential_generator'] = parent.atom_potential_generator
 				if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
 					args['phaseshifts_f'] = {}
-				args['phaseshifts_f'].update({i: thread.to_device(args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x'])) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
+				args['phaseshifts_f'].update({i: thread.to_device(args['atom_potential_generator'].cis_phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x'])) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 
 		if 'compiled_atom_phaseshift' not in args or args['compiled_atom_phaseshift'] is None:
 			args['compiled_atom_phaseshift'] = {}
@@ -260,7 +260,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 	def generate_tf(self):
 		
 		if self.phaseshifts_f is None:
-			phaseshifts_f = {i: self.thread.to_device(self.atom_potential_generator.phaseshift_f(i, self.energy, self.roi_y, self.roi_x)) for i in numpy.unique(self.atoms['Z'])}
+			phaseshifts_f = {i: self.thread.to_device(self.atom_potential_generator.cis_phaseshift_f(i, self.energy, self.roi_y, self.roi_x)) for i in numpy.unique(self.atoms['Z'])}
 		else:
 			phaseshifts_f = self.phaseshifts_f
 			

@@ -90,7 +90,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 					args['atom_potential_generator'] = parent.atom_potential_generator
 				if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
 					args['phaseshifts_f'] = {}
-				args['phaseshifts_f'].update({i: args['atom_potential_generator'].phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x']) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
+				args['phaseshifts_f'].update({i: args['atom_potential_generator'].cis_phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x']) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 			
 		parent.transfer_function_args.update(args)
 	
