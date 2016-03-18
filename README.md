@@ -26,7 +26,7 @@ The scripts are largely undocumented and might carry crippling bugs. Explanation
 
 #### Mathematics
 - coordinate transformations in 2d and 3d, chaining of transformations
-- Fourier transformation related functions (largely an interface to pyFFTW functonalities, could be extended to support other backends as well)
+- Fourier transformation related functions
 - a 2d and a 3d interpolation algorithm with COO-sparse in- and output (only linear interpolation)
 - calculation of Laplace kernels, optimized of azimuthal uniform gain
 
@@ -48,3 +48,4 @@ The scripts are largely undocumented and might carry crippling bugs. Explanation
 - Reikna <https://reikna.readthedocs.org/en/latest/>
 - Matplotlib <http://matplotlib.org/>
 - VisPy <http://vispy.org/>
+- pyFFTW <https://hgomersall.github.io/pyFFTW/index.html> (optional)

@@ -17,7 +17,33 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
 import numpy
-import pyfftw
+
+try:
+	import pyfftw
+
+	def fft(ar, *args, **kwargs):
+		if 'axis' in kwargs:
+			kwargs['axes'] = (kwargs.pop('axis'),)
+		return pyfftw.builders.fftn(ar, *args, **kwargs)()
+
+	def ifft(ar, *args, **kwargs):
+		if 'axis' in kwargs:
+			kwargs['axes'] = (kwargs.pop('axis'),)
+		return pyfftw.builders.ifftn(ar, *args, **kwargs)()
+
+except ImportError:
+	def fft(ar, *args, **kwargs):
+		if 'axis' in kwargs:
+			kwargs['axes'] = (kwargs.pop('axis'),)
+		return numpy.fft.fftn(ar, *args, **kwargs)
+
+	def ifft(ar, *args, **kwargs):
+		if 'axis' in kwargs:
+			kwargs['axes'] = (kwargs.pop('axis'),)
+		return numpy.fft.ifftn(ar, *args, **kwargs)
+
+
+
 import numexpr
 
 def reciprocal_coords(*x):
@@ -115,16 +141,6 @@ def mhalfshift(ar, axes=None, axis=None):
 	
 	return numexpr.evaluate("ar*exp(j*(%s))"%(''.join('fac%d+'%i for i in axes)[:-1]), local_dict=ldict)
 
-def fft(ar, *args, **kwargs):
-	if 'axis' in kwargs:
-		kwargs['axes'] = (kwargs.pop('axis'),)
-	return pyfftw.builders.fftn(ar, *args, **kwargs)()
-
-def ifft(ar, *args, **kwargs):
-	if 'axis' in kwargs:
-		kwargs['axes'] = (kwargs.pop('axis'),)
-	return pyfftw.builders.ifftn(ar, *args, **kwargs)()
-
 def mfft(ar, *args, **kwargs):
 	axes = None
 	if 'axis' in kwargs:
@@ -133,7 +149,7 @@ def mfft(ar, *args, **kwargs):
 	if 'axes' in kwargs:
 		axes = kwargs['axes']
 		
-	return numpy.fft.fftshift(pyfftw.builders.fftn(numpy.fft.ifftshift(ar,axes=axes), *args, **kwargs)(),axes=axes)
+	return numpy.fft.fftshift(fft(numpy.fft.ifftshift(ar,axes=axes), *args, **kwargs), axes=axes)
 
 def mifft(ar, *args, **kwargs):
 	if 'axis' in kwargs:
@@ -143,4 +159,4 @@ def mifft(ar, *args, **kwargs):
 		axes = kwargs['axes']
 	else:
 		axes = None
-	return numpy.fft.fftshift(pyfftw.builders.ifftn(numpy.fft.ifftshift(ar,axes=axes), *args, **kwargs)(),axes=axes)
+	return numpy.fft.fftshift(ifft(numpy.fft.ifftshift(ar,axes=axes), *args, **kwargs),axes=axes)
