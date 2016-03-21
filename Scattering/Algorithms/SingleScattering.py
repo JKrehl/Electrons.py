@@ -99,26 +99,45 @@ class SingleScattering:
 		rwave = wave.copy()
 		iwave = wave.copy()
 
+		if len(self.opchain)>0 and hasattr(self.opchain['operator'][0], 'thread'):
+			if not hasattr(wave, 'thread'):
+				wave = self.opchain['operator'][0].thread.to_device(wave)
+			rwave = self.opchain['operator'][0].thread.to_device(rwave)
+			iwave = self.opchain['operator'][0].thread.to_device(iwave)
+
 		if progress:
 			for op in Progress(self.opchain['operator'], self.opchain.size):
 				if isinstance(op, self.transfer_function):
-					iwave = op.apply(iwave)
+					rwave = op.apply(rwave)
 				else:
-					rwave += op.apply(iwave-wave)
-					iwave[...] = wave
+					#iwave = op.apply(iwave)
+					iwave -= wave
+					#rwave += iwave
+
+					if hasattr(iwave, 'thread'):
+						iwave.thread.copy_array(wave, iwave)
+					else:
+						iwave = wave
 		else:
 			for op in self.opchain['operator']:
 				if isinstance(op, self.transfer_function):
 					iwave = op.apply(iwave)
 				else:
-					rwave += op.apply(iwave-wave)
-					iwave[...] = wave
+					#iwave = op.apply(iwave)
+					iwave -= wave
+					rwave += op.apply(iwave)
 
-		#if hasattr(wave, 'thread'):
-		#	thread = wave.thread
-		#	wave = wave.get()
-		#	thread.synchronize()
-		#	thread.release()
-		#	del thread
+					if hasattr(iwave, 'thread'):
+						iwave.thread.copy_array(wave, iwave)
+					else:
+						iwave = wave
+
+
+		if hasattr(wave, 'thread'):
+			thread = wave.thread
+			rwave = rwave.get()
+			thread.synchronize()
+			thread.release()
+			del thread
 			
 		return rwave
