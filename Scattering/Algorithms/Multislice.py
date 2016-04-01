@@ -64,7 +64,7 @@ class Multislice:
 		
 		self.ky, self.kx = FT.reciprocal_coords(self.y, self.x)
 		self.kk = numpy.add.outer(self.ky**2, self.kx**2)
-		
+
 		i = 0
 		slice_thickness = numpy.pi/20*2*Physics.wavenumber(self.energy)/(max(numpy.pi/(self.y[1]-self.y[0]), numpy.pi/(self.x[1]-self.x[0]))**2)
 		while i<self.potential.atoms.size:
@@ -79,7 +79,11 @@ class Multislice:
 		for zi, zf in self.opchain.get_gaps():
 			self.opchain.append(self.propagator.inherit(self, zi, zf))
 
-		self.opchain.impose_zorder()
+		beg, end = self.opchain.get_caps()
+		if beg is not None:
+			self.opchain.prepend(self.propagator.inherit(self, *beg))
+		if end is not None:
+			self.opchain.append(self.propagator.inherit(self, *end))
 		
 		self.prepared = True
 

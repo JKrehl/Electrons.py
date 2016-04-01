@@ -41,7 +41,17 @@ class OperatorChain(numpy.ndarray):
 			else:
 				return []
 		else:
-			return [(zi,zf) for zi,zf in zip([self.zi]+list(self['zf']), list(self['zi'])+[self.zf]) if zi is not None and zf is not None and not zf==zi]
+			#return [(zi,zf) for zi,zf in zip([self.zi]+list(self['zf']), list(self['zi'])+[self.zf]) if zi is not None and zf is not None and not zf==zi]
+			return [(zi,zf) for zi,zf in zip(list(self['zf'][:-1]), list(self['zi'][1:])) if zi is not None and zf is not None and not zf==zi]
+
+	def get_caps(self):
+		self.impose_zorder()
+		res = [None,None]
+		if self['zi'][0] != self.zi:
+			res[0] = (self.zi, self['zi'][0])
+		if self['zf'][-1] != self.zf:
+			res[1] = (self['zf'][-1], self.zf)
+		return res
 
 	def append(self, operator, zi=None, zf=None):			
 		if zi is None:
@@ -63,6 +73,28 @@ class OperatorChain(numpy.ndarray):
 		self.resize(self.size+1, refcheck=False)
 		
 		self[-1] = (zi, zf, operator)
+
+	def prepend(self, operator, zi=None, zf=None):
+		if zi is None:
+			if hasattr(operator, 'zi'):
+				zi = operator.zi
+			elif hasattr(operator, 'z') and operator.z is not None:
+				zi = operator.z
+			else:
+				zi = numpy.amax(self['zf'])
+
+		if zf is None:
+			if hasattr(operator, 'zf'):
+				zf = operator.zf
+			else:
+				zf = zi
+
+		assert zf is not None
+
+		self.resize(self.size+1, refcheck=False)
+		self[1:] = self[:-1]
+
+		self[0] = (zi, zf, operator)
 
 	def apply(self, wave, progress=False):
 		self.impose_zorder()
