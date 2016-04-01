@@ -170,7 +170,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 								   local_dict={'ps':self.phaseshifts_f[a['Z']],
 											   'ys':dy*rpy, 'xs':dx*rpx,
 											   'ky':roi_ky[:,None], 'kx':roi_kx[None,:],
-											   'kk':roi_kk, 'B':a['B']})
+											   'kk':roi_kk, 'B':a['B']/(4*numpy.pi**2)})
 
 			tf[select] *= FT.ifft(itf)[iselect]
 		self.transfer_function = tf

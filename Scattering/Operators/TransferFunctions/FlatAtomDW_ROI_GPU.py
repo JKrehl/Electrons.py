@@ -374,7 +374,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 			ipy = int(ipy)
 			ipx = int(ipx)
 			
-			atom_phaseshift(itf, phaseshifts_f[a['Z']], rpy*dy, rpx*dx, a['B'], roi_ky, roi_kx, roi_kk)
+			atom_phaseshift(itf, phaseshifts_f[a['Z']], rpy*dy, rpx*dx, a['B']/(4*numpy.pi**2), roi_ky, roi_kx, roi_kk)
 
 			#fftshift_gpu(itf, itf)
 			fft_gpu(tmp, itf, 0)

@@ -224,7 +224,7 @@ class FlatAtomDW_GPU(PlaneOperator):
 			compiled_expi[xsign] = expi
 			
 		for a in self.atoms:
-			atom_phaseshift(tf, phaseshifts_f[a['Z']], a['zyx'][1], a['zyx'][2], a['B'], ky, kx, kk)
+			atom_phaseshift(tf, phaseshifts_f[a['Z']], a['zyx'][1], a['zyx'][2], a['B']/(4*numpy.pi**2), ky, kx, kk)
 
 		if xsign in compiled_fft_gpu:
 			fft_gpu = compiled_fft_gpu[xsign]

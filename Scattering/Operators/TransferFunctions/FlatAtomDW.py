@@ -98,7 +98,7 @@ class FlatAtomDW(PlaneOperator):
 								   local_dict={'ps':phaseshifts_f[a['Z']],
 											   'ys':a['zyx'][1], 'xs':a['zyx'][2],
 											   'ky':ky[:,None], 'kx':kx[None,:],
-											   'kk':kk, 'B':a['B']}))
+											   'kk':kk, 'B':a['B']/(4*numpy.pi**2)}))
 
 		return tf
 
