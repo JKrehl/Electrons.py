@@ -292,7 +292,7 @@ class Kernel(object):
 				os.makedirs(os.path.dirname(path))
 			self.tempfile = None
 			if not os.path.isfile(self.path):
-				h5py.File(self.path, mode='x').close()
+				h5py.File(self.path, mode='w-').close()
 		else:
 			self.tempfile = tempfile.NamedTemporaryFile(dir=os.path.expanduser("~/tmp"), suffix=".hdf")
 			self.path = self.tempfile.name
@@ -337,7 +337,7 @@ class Kernel(object):
 				os.makedirs(os.path.dirname(path))
 			self.tempfile = None
 			if not os.path.isfile(self.path):
-				h5py.File(self.path, mode='x').close()
+				h5py.File(self.path, mode='w-').close()
 		else:
 			self.tempfile = tempfile.NamedTemporaryFile(dir=os.path.expanduser("~/tmp"), suffix=".hdf")
 			self.path = self.tempfile.name

@@ -120,7 +120,7 @@ class FresnelKernel(Kernel):
 		kw_ss = FT.mreciprocal_coords(w_ss)
 		ku_ss = FT.mreciprocal_coords(u_ss)
 
-		propf = numexpr.evaluate('exp(1j*(-v/(2*k)*(kw**2+ku**2)))', local_dict=dict(j=1j, pi=numpy.pi, k=self.k, kw=kw_ss[:, None, None], v=v_ss[None, :, None], ku=ku_ss[None, None, :]))
+		propf = numexpr.evaluate('exp(1j*(v/(2*k)*(kw**2+ku**2)))', local_dict=dict(j=1j, pi=numpy.pi, k=self.k, kw=kw_ss[:, None, None], v=v_ss[None, :, None], ku=ku_ss[None, None, :]))
 
 		kr = numexpr.evaluate("sqrt(kw**2+ku**2)*dr/2", local_dict=dict(kw=kw_ss[:,None], ku=ku_ss[None,:], dr=self.bandlimit, pi=numpy.pi))
 		res_win = numexpr.evaluate('where(kr==0, 1, 2*j1kr/kr)', local_dict=dict(kr=kr, j1kr=scipy.special.j1(kr)))
