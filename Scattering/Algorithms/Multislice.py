@@ -18,7 +18,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 import numpy
 
 from ..Operators import OperatorChain
-from ..Operators.TransferFunctions import FlatAtomDW
+from ..Operators.TransmissionFunctions import FlatAtomDW
 from ..Operators.Propagators import FresnelFourier
 from ..Potentials.AtomPotentials import WeickenmeierKohl
 from ...Utilities import Progress, Physics
@@ -26,18 +26,18 @@ from ...Mathematics import FourierTransforms as FT
 
 class Multislice:
 	def __init__(self, y, x, potential, energy, zi=None, zf=None, trafo=None, atom_potential_generator=WeickenmeierKohl,
-				 transfer_function=FlatAtomDW, transfer_function_args=None,
-				 propagator=FresnelFourier, propagator_args=None):
+	             transmission_function=FlatAtomDW, transmission_function_args=None,
+	             propagator=FresnelFourier, propagator_args=None):
 
-		if transfer_function_args is None: transfer_function_args = {}
+		if transmission_function_args is None: transmission_function_args = {}
 		if propagator_args is None: propagator_args = {}
 
 		
 		self.__dict__.update(dict(y=y, x=x, energy=energy,
-								  zi=zi, zf=zf, trafo=trafo,
-								  atom_potential_generator=atom_potential_generator,
-								  transfer_function=transfer_function, transfer_function_args=transfer_function_args,
-								  propagator=propagator, propagator_args=propagator_args))
+		                          zi=zi, zf=zf, trafo=trafo,
+		                          atom_potential_generator=atom_potential_generator,
+		                          transmission_function=transmission_function, transmission_function_args=transmission_function_args,
+		                          propagator=propagator, propagator_args=propagator_args))
 		self.prepared = False
 		self.opchain = None
 		self.k = None
@@ -73,7 +73,7 @@ class Multislice:
 			while j<self.potential.atoms.size and self.potential.atoms['zyx'][j,0]<zi+slice_thickness:
 				j += 1
 
-			self.opchain.append(self.transfer_function.inherit(self, self.potential.atoms[i:j]))
+			self.opchain.append(self.transmission_function.inherit(self, self.potential.atoms[i:j]))
 			i=j
 
 		for zi, zf in self.opchain.get_gaps():

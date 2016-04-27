@@ -17,7 +17,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import numpy
 from ..Operators import OperatorChain
-from ..Operators.TransferFunctions import FlatAtomDW
+from ..Operators.TransmissionFunctions import FlatAtomDW
 from ..Potentials.AtomPotentials import WeickenmeierKohl
 from ...Mathematics import FourierTransforms as FT
 from ...Utilities import Physics
@@ -25,14 +25,14 @@ from ...Utilities import Progress
 
 class Projection:
 	def __init__(self, y, x, potential, energy, zi=None, zf=None, trafo=None, forgetful=False,
-	             atom_potential_generator=WeickenmeierKohl, transfer_function=FlatAtomDW, transfer_function_args=None):
+	             atom_potential_generator=WeickenmeierKohl, transmission_function=FlatAtomDW, transmission_function_args=None):
 
-		if transfer_function_args is None: transfer_function_args = {}
+		if transmission_function_args is None: transmission_function_args = {}
 
 		self.__dict__.update(dict(y=y, x=x, energy=energy,
-								  zi=zi, zf=zf, trafo=trafo,
-								  forgetful = forgetful,
-								  atom_potential_generator=atom_potential_generator, transfer_function=transfer_function, transfer_function_args=transfer_function_args))
+		                          zi=zi, zf=zf, trafo=trafo,
+		                          forgetful = forgetful,
+		                          atom_potential_generator=atom_potential_generator, transmission_function=transmission_function, transmission_function_args=transmission_function_args))
 		self.prepared = False
 		self.opchain = None
 		self.k = None
@@ -62,7 +62,7 @@ class Projection:
 		self.kk =  numpy.add.outer(self.kx**2, self.ky**2)
 		
 		#for i in range(self.potential.atoms.size):
-		self.opchain.append(self.transfer_function.inherit(self, self.potential.atoms))#[i:i+1]))
+		self.opchain.append(self.transmission_function.inherit(self, self.potential.atoms))#[i:i+1]))
 
 		self.opchain.impose_zorder()
 		

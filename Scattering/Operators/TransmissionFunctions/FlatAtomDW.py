@@ -39,9 +39,9 @@ class FlatAtomDW(PlaneOperator):
 								  dtype=dtype,
 								  lazy=lazy, forgetful=forgetful))
 
-		self.transfer_function = None
+		self.transmission_function = None
 		if not self.lazy:
-			self.transfer_function = self.generate_tf()
+			self.transmission_function = self.generate_tf()
 
 		self.z = numpy.mean(self.atoms['zyx'][:,0])
 
@@ -49,7 +49,7 @@ class FlatAtomDW(PlaneOperator):
 	def inherit(cls, parent, atoms, **kwargs):
 		args = {}
 
-		args.update(parent.transfer_function_args)
+		args.update(parent.transmission_function_args)
 		args.update(kwargs)
 		args.update({s:parent.__dict__[s] for s in ['y', 'x', 'ky', 'kx', 'kk'] if s not in args or args[s] is None})
 
@@ -65,7 +65,7 @@ class FlatAtomDW(PlaneOperator):
 					args['phaseshifts_f'] = {}
 				args['phaseshifts_f'].update({i: args['atom_potential_generator'].cis_phaseshift_f(i, args['energy'], args['y'], args['x']) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 
-		parent.transfer_function_args.update(args)
+		parent.transmission_function_args.update(args)
 
 		return cls(atoms, **args)
 			
@@ -103,11 +103,11 @@ class FlatAtomDW(PlaneOperator):
 		return tf
 
 	def apply(self, wave):
-		if self.transfer_function is None:
-			self.transfer_function = self.generate_tf()
+		if self.transmission_function is None:
+			self.transmission_function = self.generate_tf()
 
-		numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transfer_function, wave=wave), out=wave)
+		numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transmission_function, wave=wave), out=wave)
 
 		if self.forgetful:
-			self.transfer_function = None
+			self.transmission_function = None
 		return wave

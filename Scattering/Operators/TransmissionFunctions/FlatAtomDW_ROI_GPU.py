@@ -178,7 +178,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 		if self.compiled_fft_gpu is None: self.compiled_fft_gpu={}
 		if self.compiled_mult is None: self.compiled_mult={}
 		
-		self.transfer_function = None
+		self.transmission_function = None
 		if not self.lazy:
 			self.generate_tf()
 		
@@ -188,7 +188,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 	def inherit(cls, parent, atoms, **kwargs):
 		args = {}
 	
-		args.update({k:v for k,v in parent.transfer_function_args.items() if v is not None})
+		args.update({k:v for k,v in parent.transmission_function_args.items() if v is not None})
 		args.update({k:v for k,v in kwargs.items() if v is not None})
 
 		if hasattr(parent, 'propagator_args') and 'thread' in parent.propagator_args and isinstance(parent.propagator_args['thread'], Thread):
@@ -253,7 +253,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 
 			
 		
-		parent.transfer_function_args.update(args)
+		parent.transmission_function_args.update(args)
 		return cls(atoms, **args)
 
 	# noinspection PyUnusedLocal,PyUnusedLocal
@@ -320,7 +320,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 			kk = self.thread.to_device(kk)
 
 			
-		self.transfer_function = self.thread.to_device(numpy.ones(kk.shape, self.dtype))
+		self.transmission_function = self.thread.to_device(numpy.ones(kk.shape, self.dtype))
 		itf = self.thread.array(roi_kk.shape, self.dtype)
 		tmp = self.thread.temp_array(itf.shape, itf.dtype, itf.strides)
 
@@ -355,12 +355,12 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 
 			self.compiled_fft_gpu[xsign] = fft_gpu, fftshift_gpu
 
-		msign = (self.thread, reikna.core.Type.from_value(self.transfer_function).__repr__(), reikna.core.Type.from_value(itf).__repr__())
+		msign = (self.thread, reikna.core.Type.from_value(self.transmission_function).__repr__(), reikna.core.Type.from_value(itf).__repr__())
 		
 		if msign in self.compiled_fft_gpu:
 			mult = self.compiled_mult[msign]
 		else:
-			mult = RegionMult(self.transfer_function, itf).compile(self.thread)
+			mult = RegionMult(self.transmission_function, itf).compile(self.thread)
 			self.compiled_mult[msign] = mult
 
 		dy = self.y[1]-self.y[0]
@@ -390,7 +390,7 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 				
 			assert select[0].stop-select[0].start==iselect[0].stop-iselect[0].start and select[1].stop-select[1].start==iselect[1].stop-iselect[1].start, (py, self.y[0], dy, select, iselect)
 			if (select[0].stop-select[0].start)>0 and (select[1].stop-select[1].start)>0:
-				mult(self.transfer_function, tmp, select[0].start, select[1].start, iselect[0].start, iselect[1].start, select[0].stop-select[0].start, select[1].stop-select[1].start)
+				mult(self.transmission_function, tmp, select[0].start, select[1].start, iselect[0].start, iselect[1].start, select[0].stop - select[0].start, select[1].stop - select[1].start)
 
 		del itf
 
@@ -398,11 +398,11 @@ class FlatAtomDW_ROI_GPU(PlaneOperator):
 		if not hasattr(wave, 'thread') or wave.thread != self.thread:
 			wave = self.thread.to_device(wave)
 		
-		if self.transfer_function is None:
+		if self.transmission_function is None:
 			self.generate_tf()
 			
-		wave *= self.transfer_function
+		wave *= self.transmission_function
 		
 		if self.forgetful:
-			self.transfer_function = None
+			self.transmission_function = None
 		return wave

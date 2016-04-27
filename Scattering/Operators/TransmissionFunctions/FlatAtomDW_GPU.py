@@ -123,7 +123,7 @@ class FlatAtomDW_GPU(PlaneOperator):
 								  dtype=dtype,
 								  lazy=lazy, forgetful=forgetful))
 		
-		self.transfer_function = None
+		self.transmission_function = None
 		if not self.lazy:
 			self.generate_tf()
 		
@@ -133,7 +133,7 @@ class FlatAtomDW_GPU(PlaneOperator):
 	def inherit(cls, parent, atoms, **kwargs):
 		args = {}
 	
-		args.update({k:v for k,v in parent.transfer_function_args.items() if v is not None})
+		args.update({k:v for k,v in parent.transmission_function_args.items() if v is not None})
 		args.update({k:v for k,v in kwargs.items() if v is not None})
 
 		if 'thread' in parent.propagator_args and isinstance(parent.propagator_args['thread'], Thread):
@@ -165,7 +165,7 @@ class FlatAtomDW_GPU(PlaneOperator):
 					args['phaseshifts_f'] = {}
 				args['phaseshifts_f'].update({i: thread.to_device(args['atom_potential_generator'].cis_phaseshift_f(i, args['energy'], args['y'], args['x'])) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 
-		parent.transfer_function_args.update(args)
+		parent.transmission_function_args.update(args)
 		return cls(atoms, **args)
 			
 	def generate_tf(self):
@@ -238,17 +238,17 @@ class FlatAtomDW_GPU(PlaneOperator):
 
 		self.thread.copy_array(tf, tmp)
 
-		self.transfer_function = tf
+		self.transmission_function = tf
 
 	def apply(self, wave):
 		if not hasattr(wave, 'thread') or wave.thread != self.thread:
 			wave = self.thread.to_device(wave)
 		
-		if self.transfer_function is None:
+		if self.transmission_function is None:
 			self.generate_tf()
 
-		wave *= self.transfer_function
+		wave *= self.transmission_function
 		
 		if self.forgetful:
-			self.transfer_function = None
+			self.transmission_function = None
 		return wave

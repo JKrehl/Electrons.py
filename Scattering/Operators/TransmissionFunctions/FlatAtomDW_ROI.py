@@ -43,7 +43,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 								  lazy=lazy, forgetful=forgetful))
 
 		self.phaseshifts_f = None
-		self.transfer_function = None
+		self.transmission_function = None
 		if not self.lazy:
 			self.generate_tf()
 		
@@ -53,7 +53,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 	def inherit(cls, parent, atoms, **kwargs):
 		args = {}
 		
-		args.update(parent.transfer_function_args)
+		args.update(parent.transmission_function_args)
 		args.update(kwargs)
 		
 		args.update({s:parent.__dict__[s] for s in ['y', 'x', 'ky', 'kx', 'kk'] if s not in args or args[s] is None})
@@ -92,7 +92,7 @@ class FlatAtomDW_ROI(PlaneOperator):
 					args['phaseshifts_f'] = {}
 				args['phaseshifts_f'].update({i: args['atom_potential_generator'].cis_phaseshift_f(i, args['energy'], args['roi_y'], args['roi_x']) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
 			
-		parent.transfer_function_args.update(args)
+		parent.transmission_function_args.update(args)
 	
 		return cls(atoms, **args)
 
@@ -173,12 +173,12 @@ class FlatAtomDW_ROI(PlaneOperator):
 											   'kk':roi_kk, 'B':a['B']/(4*numpy.pi**2)})
 
 			tf[select] *= FT.ifft(itf)[iselect]
-		self.transfer_function = tf
+		self.transmission_function = tf
 
 	def apply(self, wave):
-		if self.transfer_function is None:
+		if self.transmission_function is None:
 			self.generate_tf()
-		res = numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transfer_function, wave=wave))
+		res = numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transmission_function, wave=wave))
 		if self.forgetful:
-			self.transfer_function = None
+			self.transmission_function = None
 		return res
