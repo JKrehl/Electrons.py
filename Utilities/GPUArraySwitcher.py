@@ -15,17 +15,31 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 """
 
-import numpy
+class GPUArraySwitcher:
+	def __init__(self, array, thread=None):
+		self.memory = array
 
-from .Base import PlaneOperator
+		if thread is not None:
+			self.gpu = thread.to_device(array)
+			self._mode = "memory"
+		else:
+			self.gpu = None
+			self._mode = "memory_locked"
 
-class SliceStacker(PlaneOperator):
-	def __init__(self):
-		self.stack = []
-		
-	def apply(self,wave):
-		self.stack.append(wave.copy())
-		return wave
+	@property
+	def on_gpu(self):
+		if self._mode == "memory_locked":
+			raise BufferError("requested gpu array without enabling gpu operations")
+		if self._mode == "memory":
+			self.gpu.thread.to_device(self.memory, self.gpu)
+			self._mode = "gpu"
 
-	def get(self):
-		return numpy.concatenate(tuple(i.reshape(1, *i.shape) for i in self.stack), axis=0)
+		return self.gpu
+
+	@property
+	def in_mem(self):
+		if self._mode == "gpu":
+			self.gpu.thread.from_device(self.gpu, self.memory)
+			self.mode = "memory"
+
+		return self.memory
