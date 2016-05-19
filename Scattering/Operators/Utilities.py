@@ -24,7 +24,10 @@ class SliceStacker(PlaneOperator):
 		self.stack = []
 		
 	def apply(self,wave):
-		self.stack.append(wave.copy())
+		if hasattr(wave, 'thread'):
+			self.stack.append(wave.get())
+		else:
+			self.stack.append(wave.copy())
 		return wave
 
 	def get(self):
