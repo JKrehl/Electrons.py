@@ -21,39 +21,35 @@ from scipy import ndimage
 from ....Mathematics import FourierTransforms as FT
 from ....Utilities import Physics
 
-from ..Base import IntervalOperator
+from ..Operator import IntervalOperator
 
 class FresnelFourier(IntervalOperator):
-	def __init__(self, zi, zf, k=None, kk=None, ky=None, kx=None, y=None, x=None):
-		self.__dict__.update(dict(zi=zi,zf=zf, k=k, kk=kk))
+	def __init__(self, zi, zf,
+	             kk = None, ky = None, kx = None,
+	             k = None, energy = None,
+	             y = None, x = None,
+	             factory = False):
+		super().__init__(zi, zf)
 
-		if self.kk is None:
-			if ky is None:
-				ky = FT.reciprocal_coords(y)
-			if kx is None:
-				kx = FT.reciprocal_coords(x)
-			
+		if kk is None:
+			if ky is None: ky = FT.reciprocal_coords(y)
+			if kx is None: kx = FT.reciprocal_coords(x)
 			self.kk = numpy.add.outer(ky**2, kx**2)
-		
+		else:
+			self.kk = kk
+
+		if k is None: self.k = Physics.wavenumber(energy)
+		else: self.k = k
+
+	def derive(self, zi, zf, **kwargs):
+		args = dict(k=self.k, kk=self.kk)
+		args.update(kwargs)
+
+		return self.__class__(zi, zf, **args)
+
 	def apply(self, wave):
 		return FT.ifft(numexpr.evaluate('wave_f*exp(-1j*dis/(2*wn)*kk)', local_dict={'wave_f':FT.fft(wave), 'pi':numpy.pi, 'dis':self.zf-self.zi, 'wn':self.k, 'kk':self.kk}))
 
 	def split(self, z):
-		return FresnelFourier(self.zi, z, self.k, self.kk), FresnelFourier(z, self.zf, self.k, self.kk)
+		return self.derive(self.zi, z), self.derive(z, self.zf)
 
-	@classmethod
-	def inherit(cls, parent, zi, zf, **kwargs):
-		args = {}
-
-		args.update({k:v for k,v in parent.propagator_args.items() if v is not None})
-		args.update({k:v for k,v in kwargs.items() if v is not None})
-
-		if not 'kk' in args or args['kk'] is None:
-			args['kk'] = parent.kk
-
-		if not 'k' in args or args['k'] is None:
-			args['k'] = Physics.wavenumber(parent.energy)
-
-		parent.propagator_args.update(args)
-		
-		return cls(zi, zf, **args)

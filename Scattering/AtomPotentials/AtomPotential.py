@@ -17,8 +17,8 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import numpy
 
-from ....Utilities.Physics import bohrr, echarge, interaction_const
-from ....Mathematics import FourierTransforms as FT
+from ...Utilities.Physics import bohrr, echarge, interaction_const
+from ...Mathematics import FourierTransforms as FT
 
 class AtomPotential:
 	def __init__(self):

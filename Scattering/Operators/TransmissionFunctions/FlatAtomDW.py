@@ -17,97 +17,90 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import numpy
 import numexpr
-import scipy.interpolate
 
 from ....Mathematics import FourierTransforms as FT
-from ...Potentials.AtomPotentials import WeickenmeierKohl
+from ...AtomPotentials import WeickenmeierKohl
 
-import gc
-
-from ..Base import PlaneOperator
+from ..Operator import PlaneOperator
 
 class FlatAtomDW(PlaneOperator):
-	def __init__(self, atoms, phaseshifts_f=None,
-				 ky=None, kx=None, kk=None,
-				 atom_potential_generator=WeickenmeierKohl, energy=None, y=None, x=None,
-				 dtype=numpy.complex,
-				 lazy=True, forgetful=True):
-		self.__dict__.update(dict(atoms=atoms,
-								  phaseshifts_f=phaseshifts_f,
-								  ky=ky, kx=kx, kk=kk,
-								  atom_potential_generator=atom_potential_generator, energy=energy, y=y, x=x,
-								  dtype=dtype,
-								  lazy=lazy, forgetful=forgetful))
+	def __init__(self, atoms,
+	             ky = None, kx=None, kk=None,
+	             formfactors_tf = None,
+	             y = None, x = None,
+	             atom_potential = WeickenmeierKohl, energy = None,
+	             dtype = numpy.complex,
+	             lazy = False, forgetful = True, factory = False):
+
+		super().__init__(None)
+
+		self.atoms = atoms
+
+		self.dtype = dtype
+		self.lazy, self.forgetful = lazy, forgetful
+		self.factory = factory
+
+		self.ky, self.kx, self.kk = ky, kx, kk
+		if self.ky is None: self.ky = FT.reciprocal_coords(y)
+		if self.kx is None: self.kx = FT.reciprocal_coords(x)
+		if self.kk is None: self.kk = numpy.add.outer(self.ky**2, self.kx**2)
+
+		self.formfactors_tf = formfactors_tf
+		if self.formfactors_tf is None:
+			if self.lazy:
+				self.atom_potential = atom_potential
+				self.energy = energy
+				self.y, self.x = y, x
+			else:
+				self.formfactors_tf = {i: atom_potential.cis_phaseshift_f(i, energy, y, x) for i in numpy.unique(self.atoms['Z'])}
 
 		self.transmission_function = None
-		if not self.lazy:
-			self.transmission_function = self.generate_tf()
+		if self.lazy == 0:
+			self.transmission_function = self.generate_transmission_function()
 
 		self.z = numpy.mean(self.atoms['zyx'][:,0])
 
-	@classmethod
-	def inherit(cls, parent, atoms, **kwargs):
-		args = {}
+	def derive(self, atoms, **kwargs):
+		args = dict(ky = self.ky, kx = self.kx, kk = self.kk,
+		            formfactors_tf = self.formfactors_tf,
+		            dtype = self.dtype,
+		            lazy = self. lazy, forgetful = self.forgetful, factory = False)
 
-		args.update(parent.transmission_function_args)
+		if hasattr(self, "atom_potential"):
+			args.update(atom_potential=self.atom_potential, energy=self.energy, y=self.y, x=self.x)
+
 		args.update(kwargs)
-		args.update({s:parent.__dict__[s] for s in ['y', 'x', 'ky', 'kx', 'kk'] if s not in args or args[s] is None})
 
-		if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None or not set(numpy.unique(atoms['Z'])).issubset(set(args['phaseshifts_f'].keys())):
-			if hasattr(parent, 'phaseshifts_f') and parent.phaseshifts_f is not None:
-				args['phaseshifts_f'] = parent.phaseshifts_f
-			else:
-				if 'energy' not in args or args['energy'] is None:
-					args['energy'] = parent.energy
-				if 'atom_potential_generator' not in args or args['atom_potential_generator'] is None:
-					args['atom_potential_generator'] = parent.atom_potential_generator
-				if 'phaseshifts_f' not in args or args['phaseshifts_f'] is None:
-					args['phaseshifts_f'] = {}
-				args['phaseshifts_f'].update({i: args['atom_potential_generator'].cis_phaseshift_f(i, args['energy'], args['y'], args['x']) for i in set(numpy.unique(atoms['Z'])).difference(set(args['phaseshifts_f'].keys()))})
+		return self.__class__(atoms, **args)
 
-		parent.transmission_function_args.update(args)
+	def generate_transmission_function(self):
+		if self.factory: return None
 
-		return cls(atoms, **args)
-			
-	def generate_tf(self):
-
-		if self.phaseshifts_f is None:
-			phaseshifts_f = {i: self.atom_potential_generator.cis_phaseshift_f(i, self.energy, self.y, self.x) for i in numpy.unique(self.atoms['Z'])}
+		if self.formfactors_tf is None:
+			formfactors_tf = {i: self.atom_potential.cis_phaseshift_f(i, self.energy, self.y, self.x) for i in numpy.unique(self.atoms['Z'])}
+			if not self.forgetful:
+				self.formfactors_tf = formfactors_tf
 		else:
-			phaseshifts_f = self.phaseshifts_f
+			formfactors_tf = self.formfactors_tf
 
-		if self.ky is None:
-			ky = FT.reciprocal_coords(self.y)
-		else:
-			ky = self.ky
-			
-		if self.kx is None:
-			kx = FT.reciprocal_coords(self.x)
-		else:
-			kx = self.kx
-
-		if self.kk is None:
-			kk = numpy.add.outer(ky**2, kx**2)
-		else:
-			kk = self.kk
-
-		tf = numpy.ones(kk.shape, dtype=self.dtype)
+		transmission_function = numpy.ones(self.kk.shape, dtype=self.dtype)
 
 		for a in self.atoms:
-			tf *= FT.ifft(numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
-								   local_dict={'ps':phaseshifts_f[a['Z']],
+			transmission_function *= FT.ifft(numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
+								   local_dict={'ps':formfactors_tf[a['Z']],
 											   'ys':a['zyx'][1], 'xs':a['zyx'][2],
-											   'ky':ky[:,None], 'kx':kx[None,:],
-											   'kk':kk, 'B':a['B']/(4*numpy.pi**2)}))
+											   'ky':self.ky[:,None], 'kx':self.kx[None,:],
+											   'kk':self.kk, 'B':a['B']/(4*numpy.pi**2)}))
 
-		return tf
+		return transmission_function
 
 	def apply(self, wave):
 		if self.transmission_function is None:
-			self.transmission_function = self.generate_tf()
+			self.transmission_function = self.generate_transmission_function()
 
 		numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transmission_function, wave=wave), out=wave)
 
 		if self.forgetful:
 			self.transmission_function = None
+
 		return wave

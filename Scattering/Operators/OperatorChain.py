@@ -19,82 +19,81 @@ import numpy
 
 from ...Utilities import Progress
 
-from .Base import IntervalOperator, PlaneOperator
+from .Operator import IntervalOperator, PlaneOperator
 
 class OperatorChain(numpy.ndarray):
-	def __new__(cls, *args, **kwargs):
-		return numpy.ndarray.__new__(cls, 0, dict(names=['zi','zf', 'operator'], formats=[numpy.float,numpy.float,object])).copy()
-	def __array_finalize__(self, obj):
-		pass
-	def __init__(self, zi=None, zf=None):
-		self.__dict__.update(dict(zi=zi,zf=zf))
+	def __new__(cls, shape=0, array=None, zi=None, zf=None):
+		if array is not None:
+			return numpy.asanyarray(array, dtype=dict(names=['zi','zf', 'operator'], formats=[numpy.float,numpy.float,object]))
+		else:
+			return numpy.ndarray.__new__(cls, shape, dtype=dict(names=['zi','zf', 'operator'], formats=[numpy.float,numpy.float,object]))
 
-	def impose_zorder(self):
+	def __init__(self, shape=0, array=None, zi=None, zf=None):
+		self.zi, self.zf = zi, zf
+
+	def __array_finalize__(self, obj):
+		if obj is None: return
+		self.zi = getattr(obj, 'zi', None)
+		self.zf = getattr(obj, 'zf', None)
+
+	def insert(self, position, operator):
+		self.resize(self.size+1, refcheck=False)
+		self[position+1:] = self[position:-1]
+
+		if isinstance(operator, PlaneOperator):
+			self[position] = (operator.z, operator.z, operator)
+		elif isinstance(operator, IntervalOperator):
+			self[position] = (operator.zi, operator.zf, operator)
+		else:
+			raise NotImplementedError("Operators of type %s cannot be integrated into operator chain."%str(type(operator)))
+
+	def append(self, operator):
+		self.insert(self.size, operator)
+
+	def prepend(self, operator):
+		self.insert(0, operator)
+
+	def zinsert(self, operator, z=None):
+		if z is None: z = operator.z
+
+		arg = numpy.nonzero((self['zi'] == z)&(self['zi'] < self['zf']))[0]
+		if len(arg) != 0:
+			self.insert(arg[0], operator)
+			return True
+
+		arg = tuple(numpy.nonzero((self['zi'] < z)&(self['zf'] > z)))[0]
+		if len(arg) != 0:
+			ops = self['operator'][arg[0]].split(z)
+			self[arg[0]] = (ops[1].zi, ops[1].zf, ops[1])
+			self.insert(arg[0], operator)
+			self.insert(arg[0], ops[0])
+			return True
+
+		raise NotImplementedError
+
+	def sortz(self):
 		self[...] = self[numpy.argsort(self['zf'], kind='mergesort')]
 		self[...] = self[numpy.argsort(self['zi'], kind='mergesort')]
 
-	def get_gaps(self):
-		self.impose_zorder()
-		if self.size == 0:
-			if self.zi != self.zf:
-				return [(self.zi, self.zf)]
-			else:
-				return []
+	def iszcontinuous(self):
+		if self.size!=0:
+			return numpy.all(numpy.diff(numpy.vstack((self['zi'][:-1], self['zf'][1:])), axis=0)==0)
+
+	def get_gaps(self, indices=False):
+		zfs = self['zf'][:-1]
+		zis = self['zi'][1:]
+		if self.zf is not None:
+			zfs = numpy.hstack((zfs, self['zf'][-1]))
+			zis = numpy.hstack((zis, self.zf))
+		if self.zi is not None:
+			zfs = numpy.hstack((self.zi, zfs))
+			zis = numpy.hstack((self['zi'][0], zis))
+
+		gaps = numpy.vstack((zfs, zis)).T
+		if indices:
+			return numpy.vstack((numpy.arange(gaps.shape[0]), gaps[numpy.diff(gaps).flatten()!=0,:].T)).T
 		else:
-			#return [(zi,zf) for zi,zf in zip([self.zi]+list(self['zf']), list(self['zi'])+[self.zf]) if zi is not None and zf is not None and not zf==zi]
-			return [(zi,zf) for zi,zf in zip(list(self['zf'][:-1]), list(self['zi'][1:])) if zi is not None and zf is not None and not zf==zi]
-
-	def get_caps(self):
-		self.impose_zorder()
-		res = [None,None]
-		if self['zi'][0] != self.zi:
-			res[0] = (self.zi, self['zi'][0])
-		if self['zf'][-1] != self.zf:
-			res[1] = (self['zf'][-1], self.zf)
-		return res
-
-	def append(self, operator, zi=None, zf=None):			
-		if zi is None:
-			if hasattr(operator, 'zi'):
-				zi = operator.zi
-			elif hasattr(operator, 'z') and operator.z is not None:
-				zi = operator.z
-			else:
-				zi = numpy.amax(self['zf'])
-
-		if zf is None:
-			if hasattr(operator, 'zf'):
-				zf = operator.zf
-			else:
-				zf = zi
-
-		assert zf is not None
-				
-		self.resize(self.size+1, refcheck=False)
-		
-		self[-1] = (zi, zf, operator)
-
-	def prepend(self, operator, zi=None, zf=None):
-		if zi is None:
-			if hasattr(operator, 'zi'):
-				zi = operator.zi
-			elif hasattr(operator, 'z') and operator.z is not None:
-				zi = operator.z
-			else:
-				zi = numpy.amax(self['zf'])
-
-		if zf is None:
-			if hasattr(operator, 'zf'):
-				zf = operator.zf
-			else:
-				zf = zi
-
-		assert zf is not None
-
-		self.resize(self.size+1, refcheck=False)
-		self[1:] = self[:-1]
-
-		self[0] = (zi, zf, operator)
+			return gaps[numpy.diff(gaps).flatten()!=0,:]
 
 	def apply(self, wave, progress=False):
 		self.impose_zorder()

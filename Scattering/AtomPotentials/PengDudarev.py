@@ -16,29 +16,24 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 """
 
 import numpy
+import numexpr
 
-from ....Mathematics import FourierTransforms as FT
-
-from .Base import AtomPotential
+from .AtomPotential import AtomPotential
 
 import functools
 import os.path
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
-coeff = {int(i[0]):i[1:] for i in numpy.loadtxt(__dir__+"/parameters/weickenmeier_kohl_fscatt_coefficients.dat")}
+coeff = {int(i[0]):i[1:] for i in numpy.loadtxt(__dir__+"/parameters/peng_dudarev_coefficients.dat")}
 
 _kds = 1.e10*4*numpy.pi
 
-class WeickenmeierKohlFSCATT(AtomPotential):
+class PengDudarev(AtomPotential):
 	def __init__(self):
 		pass
 
 	@classmethod
 	def form_factors_k(cls, Z, *k):
 		ss = functools.reduce(numpy.add.outer,tuple((numpy.require(i)/_kds)**2 for i in k), 0)
-		mss = ss!=0
-		
-		re = numpy.empty_like(ss, type(coeff[Z][0]))
-		re[mss] = (lambda ss:1.e-10*sum(numpy.where(B*ss>1/(2*numpy.pi), A/ss*numpy.where(B*ss>20/(2*numpy.pi), 1, (1-numpy.exp(-B*ss))), A*B*(1-.5*B*ss)) for (A,B) in zip(coeff[Z][:4], coeff[Z][4:8])))(ss[mss])
-		re[~mss] = (lambda ss:1.e-10*sum(A*B for (A,B) in zip(coeff[Z][:4], coeff[Z][4:8])))(ss[~mss])
-		return re
+		a0,a1,a2,a3,a4,b0,b1,b2,b3,b4 = coeff[Z]
+		return numexpr.evaluate("1e-10*(a0*exp(-b0*ss)+a1*exp(-b1*ss)+a2*exp(-b2*ss)+a3*exp(-b3*ss)+a4*exp(-b4*ss))",local_dict=dict(ss=ss,a0=a0,a1=a1,a2=a2,a3=a3,a4=a4,b0=b0,b1=b1,b2=b2,b3=b3,b4=b4))

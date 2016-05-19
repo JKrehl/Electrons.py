@@ -20,8 +20,7 @@ import numexpr
 
 import scipy.special
 
-from ....Mathematics import FourierTransforms as FT
-from .Base import AtomPotential
+from .AtomPotential import AtomPotential
 
 import functools
 import os.path
