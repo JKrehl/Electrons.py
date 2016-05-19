@@ -11,3 +11,6 @@
 *.el
 __pycache__
 .idea
+
+build
+dist

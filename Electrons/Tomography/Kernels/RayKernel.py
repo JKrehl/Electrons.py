@@ -19,7 +19,6 @@ import numpy
 import numexpr
 
 from ...Utilities import Progress
-from ...Utilities import CompressedSparse as CS
 from ...Utilities.Magic import apply_if
 
 from .Kernel import Kernel
