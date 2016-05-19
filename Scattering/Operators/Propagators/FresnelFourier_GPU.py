@@ -88,8 +88,8 @@ class FresnelFourier_GPU(IntervalOperator):
 		args.update({k:v for k,v in parent.propagator_args.items() if v is not None})
 		args.update({k:v for k,v in kwargs.items() if v is not None})
 
-		if 'thread' in parent.transfer_function_args and isinstance(parent.transfer_function_args['thread'], Thread):
-			args['thread'] = parent.transfer_function_args['thread']
+		if 'thread' in parent.transmission_function_args and isinstance(parent.transmission_function_args['thread'], Thread):
+			args['thread'] = parent.transmission_function_args['thread']
 		elif not 'thread' in args or args['thread'] is None:
 			args['thread'] = reikna.cluda.any_api().Thread.create()
 		elif isinstance(args['thread'], Thread):

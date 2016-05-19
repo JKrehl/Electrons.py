@@ -236,9 +236,9 @@ class FlatAtomDW_GPU(PlaneOperator):
 		tmp = self.thread.temp_array(tf.shape, tf.dtype, tf.strides)
 		fft_gpu(tmp, tf, 1)
 
-		self.thread.copy_array(tf, tmp)
+		#self.thread.copy_array(tf, tmp)
 
-		self.transmission_function = tf
+		self.transmission_function = tmp
 
 	def apply(self, wave):
 		if not hasattr(wave, 'thread') or wave.thread != self.thread:
