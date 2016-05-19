@@ -54,11 +54,11 @@ class SingleScattering:
 			self.zf = self.potential.zmax()
 		if self.zi is None:
 			self.zi = self.potential.zmin()
+
+		self.opchain = OperatorChain(zi=self.zi, zf=self.zf)
 		
 	def prepare(self):
 		self.potential.zsort()
-		
-		self.opchain = OperatorChain(zi=self.zi, zf=self.zf)
 
 		self.k = Physics.wavenumber(self.energy)
 		

@@ -39,7 +39,6 @@ class Multislice:
 		                          transmission_function=transmission_function, transmission_function_args=transmission_function_args,
 		                          propagator=propagator, propagator_args=propagator_args))
 		self.prepared = False
-		self.opchain = None
 		self.k = None
 		self.kx = None
 		self.ky = None
@@ -54,11 +53,11 @@ class Multislice:
 			self.zf = self.potential.zmax()
 		if self.zi is None:
 			self.zi = self.potential.zmin()
+
+		self.opchain = OperatorChain()
 		
 	def prepare(self):
 		self.potential.zsort()
-		
-		self.opchain = OperatorChain(zi=self.zi, zf=self.zf)
 
 		self.k = Physics.wavenumber(self.energy)
 		
