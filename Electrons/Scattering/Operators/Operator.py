@@ -16,6 +16,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 """
 
 import numpy
+from .AbstractArray import AbstractArray
 
 class Operator:
 	def apply(self, wave):
@@ -33,14 +34,6 @@ class IntervalOperator:
 	def split(self, z):
 		raise NotImplemented
 
-class SliceStacker():
-	def __init__(self, callback=None):
-		super().__init__(None)
-
-		self.callback = callback
-
-
-
 class Slice(PlaneOperator):
 	def __init__(self, z, callback=None):
 		super().__init__(z)
@@ -48,9 +41,12 @@ class Slice(PlaneOperator):
 
 		self.slice = None
 
-	def apply(self,wave):
+	def apply(self, wave, out=None):
+		if isinstance(wave, AbstractArray):
+			wave = wave.set_mode("numpy")
+
 		if self.callback is not None:
-			self.callback(wave)
+			self.callback(self, wave)
 		else:
 			self.slice = wave.copy()
 		return wave
@@ -60,7 +56,7 @@ class SliceStacker():
 		self.callback = callback
 		self.stack = []
 
-	def draw(self, z):
+	def slice(self, z):
 		self.stack.append(Slice(z, self.callback))
 		return self.stack[-1]
 

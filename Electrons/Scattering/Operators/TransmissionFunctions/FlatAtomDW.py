@@ -21,16 +21,18 @@ import numexpr
 from ....Mathematics import FourierTransforms as FT
 from ...AtomPotentials import WeickenmeierKohl
 
-from ..Operator import PlaneOperator
+from ...Operators import PlaneOperator
+from ...Operators import AbstractArray
 
 class FlatAtomDW(PlaneOperator):
 	def __init__(self, atoms,
+	             z = None,
 	             ky = None, kx=None, kk=None,
-	             formfactors_tf = None,
+	             phaseshifts_tf = None,
 	             y = None, x = None,
 	             atom_potential = WeickenmeierKohl, energy = None,
 	             dtype = numpy.complex,
-	             lazy = False, forgetful = True, factory = False):
+	             lazy = True, forgetful = True, factory = False):
 
 		super().__init__(None)
 
@@ -45,24 +47,26 @@ class FlatAtomDW(PlaneOperator):
 		if self.kx is None: self.kx = FT.reciprocal_coords(x)
 		if self.kk is None: self.kk = numpy.add.outer(self.ky**2, self.kx**2)
 
-		self.formfactors_tf = formfactors_tf
-		if self.formfactors_tf is None:
+		self.phaseshifts_tf = phaseshifts_tf
+		if self.phaseshifts_tf is None:
 			if self.lazy:
 				self.atom_potential = atom_potential
 				self.energy = energy
 				self.y, self.x = y, x
 			else:
-				self.formfactors_tf = {i: atom_potential.cis_phaseshift_f(i, energy, y, x) for i in numpy.unique(self.atoms['Z'])}
+				self.phaseshifts_tf = {i: atom_potential.cis_phaseshift_f(i, energy, y, x) for i in numpy.unique(self.atoms['Z'])}
 
 		self.transmission_function = None
 		if self.lazy == 0:
 			self.transmission_function = self.generate_transmission_function()
 
-		self.z = numpy.mean(self.atoms['zyx'][:,0])
+		self.z = z
+		if self.z is None:
+			self.z = numpy.mean(self.atoms['zyx'][:,0])
 
 	def derive(self, atoms, **kwargs):
 		args = dict(ky = self.ky, kx = self.kx, kk = self.kk,
-		            formfactors_tf = self.formfactors_tf,
+		            phaseshifts_tf = self.phaseshifts_tf,
 		            dtype = self.dtype,
 		            lazy = self. lazy, forgetful = self.forgetful, factory = False)
 
@@ -76,18 +80,18 @@ class FlatAtomDW(PlaneOperator):
 	def generate_transmission_function(self):
 		if self.factory: return None
 
-		if self.formfactors_tf is None:
-			formfactors_tf = {i: self.atom_potential.cis_phaseshift_f(i, self.energy, self.y, self.x) for i in numpy.unique(self.atoms['Z'])}
+		if self.phaseshifts_tf is None:
+			phaseshifts_tf = {i: self.atom_potential.cis_phaseshift_f(i, self.energy, self.y, self.x) for i in numpy.unique(self.atoms['Z'])}
 			if not self.forgetful:
-				self.formfactors_tf = formfactors_tf
+				self.phaseshifts_tf = phaseshifts_tf
 		else:
-			formfactors_tf = self.formfactors_tf
+			phaseshifts_tf = self.phaseshifts_tf
 
 		transmission_function = numpy.ones(self.kk.shape, dtype=self.dtype)
 
 		for a in self.atoms:
 			transmission_function *= FT.ifft(numexpr.evaluate('ps*exp(-1j*(xs*kx+ys*ky)-kk*B/8)',
-								   local_dict={'ps':formfactors_tf[a['Z']],
+								   local_dict={'ps':phaseshifts_tf[a['Z']],
 											   'ys':a['zyx'][1], 'xs':a['zyx'][2],
 											   'ky':self.ky[:,None], 'kx':self.kx[None,:],
 											   'kk':self.kk, 'B':a['B']/(4*numpy.pi**2)}))
@@ -98,7 +102,10 @@ class FlatAtomDW(PlaneOperator):
 		if self.transmission_function is None:
 			self.transmission_function = self.generate_transmission_function()
 
-		numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transmission_function, wave=wave), out=wave)
+		if isinstance(wave, AbstractArray):
+			wave = wave._as("numpy")
+
+			numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transmission_function, wave=wave), out=wave)
 
 		if self.forgetful:
 			self.transmission_function = None

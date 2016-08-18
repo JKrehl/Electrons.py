@@ -21,7 +21,8 @@ from scipy import ndimage
 from ....Mathematics import FourierTransforms as FT
 from ....Utilities import Physics
 
-from ..Operator import IntervalOperator
+from ...Operators import IntervalOperator
+from ...Operators import AbstractArray
 
 class FresnelFourier(IntervalOperator):
 	def __init__(self, zi, zf,
@@ -47,9 +48,17 @@ class FresnelFourier(IntervalOperator):
 
 		return self.__class__(zi, zf, **args)
 
-	def apply(self, wave):
-		return FT.ifft(numexpr.evaluate('wave_f*exp(-1j*dis/(2*wn)*kk)', local_dict={'wave_f':FT.fft(wave), 'pi':numpy.pi, 'dis':self.zf-self.zi, 'wn':self.k, 'kk':self.kk}))
+	def apply(self, wave, out=None):
+		if isinstance(wave, AbstractArray):
+			wave = wave._as("numpy")
+
+		re = FT.ifft(numexpr.evaluate('wave_f*exp(-1j*dis/(2*wn)*kk)', local_dict={'wave_f':FT.fft(wave), 'pi':numpy.pi, 'dis':self.zf-self.zi, 'wn':self.k, 'kk':self.kk}))
+
+		if out is None:
+			return re
+		else:
+			out[...] = re
+			return out
 
 	def split(self, z):
 		return self.derive(self.zi, z), self.derive(z, self.zf)
-

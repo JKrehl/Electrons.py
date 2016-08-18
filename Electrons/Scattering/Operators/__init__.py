@@ -1,5 +1,6 @@
 from .Operator import Operator, PlaneOperator, IntervalOperator, Slice, SliceStacker
 from .OperatorChain import OperatorChain
+from .AbstractArray import AbstractArray
 
 from . import Propagators
 from . import TransmissionFunctions

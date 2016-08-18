@@ -1,10 +1,9 @@
-from . import Physics
-from .SlicePlayer import SlicePlayer
-from .Progress import Progress
-from .Colourmap import SymNorm
 from . import Magic
+from . import Physics
 from .AtomsViewer import AtomsViewer
+from .Colourmap import SymNorm
 from .ImExport import imexport
-from . GPUArraySwitcher import GPUArraySwitcher
+from .Progress import Progress
+from .SlicePlayer import SlicePlayer
 
 __all__ = [s for s in dir() if not s.startswith('_')]

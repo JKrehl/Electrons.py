@@ -16,6 +16,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 """
 
 import numpy
+import inspect
 
 from ..Operators import OperatorChain
 from ..Operators.TransmissionFunctions import FlatAtomDW
@@ -23,11 +24,12 @@ from ..Operators.Propagators import FresnelFourier
 from ..AtomPotentials import WeickenmeierKohl
 from ...Utilities import Progress, Physics
 from ...Mathematics import FourierTransforms as FT
+from ..Operators import AbstractArray
 
 class Multislice:
-	def __init__(self, y, x, specimen, energy, zi=None, zf=None, slicer="trivial", atom_potential_generator=WeickenmeierKohl,
-	             transmission_function=FlatAtomDW, transmission_function_args={},
-	             propagator=FresnelFourier, propagator_args={}):
+	def __init__(self, y, x, specimen, energy, zi=None, zf=None, slicer="bunching", atom_potential_generator=WeickenmeierKohl,
+	             transmission_function=FlatAtomDW, transmission_function_args=None,
+	             propagator=FresnelFourier, propagator_args=None):
 
 		self.specimen = specimen
 		self.slicer = slicer
@@ -36,40 +38,56 @@ class Multislice:
 		self.zi, self.zf = zi, zf
 		self.atom_potential_generator = atom_potential_generator
 		self.transmission_function = transmission_function
-		self.transmission_function_args = transmission_function_args
+		self.transmission_function_args = (lambda a: dict() if a is None else a)(transmission_function_args)
 		self.propagator = propagator
-		self.propagator_args = propagator_args
+		self.propagator_args = (lambda a: dict() if a is None else a)(propagator_args)
 
 		self.prepared = False
-		self.opchain = None
+		self.opchain = OperatorChain(zi=self.zi, zf=self.zf)
 
 		self.shared = dict()
 
 	def prepare(self):
-		self.opchain = OperatorChain(zi=self.zi, zf=self.zf)
-
 		self.k = Physics.wavenumber(self.energy)
-		
+
 		self.ky, self.kx = FT.reciprocal_coords(self.y, self.x)
 		self.kk = numpy.add.outer(self.ky**2, self.kx**2)
 
-		self.transmission_function_factory = self.transmission_function(self.specimen.atoms,
-		                                                                y=self.y, x=self.x, energy=self.energy,
-		                                                                factory=True,
-		                                                                **self.transmission_function_args)
+		self.transmission_function_generator = self.transmission_function(self.specimen.atoms,
+		                                                                  y=self.y, x=self.x, energy=self.energy,
+		                                                                  factory=True,
+		                                                                  **self.transmission_function_args)
 
 		if self.slicer == "trivial":
 			self.specimen.zsort()
 			for i in range(self.specimen.atoms.size):
-				self.opchain.append(self.transmission_function_factory.derive(self.specimen.atoms[i:i+1]))
+				self.opchain.append(self.transmission_function_generator.derive(self.specimen.atoms[i:i + 1]))
+
+		elif self.slicer == "bunching":
+			slice_thickness = numpy.pi/20*2*Physics.wavenumber(self.energy)/(max(numpy.pi/(self.y[1]-self.y[0]), numpy.pi/(self.x[1]-self.x[0]))**2)
+			zs = self.specimen.atoms['zyx'][:,0]
+			mean_z = numpy.mean(zs)
+			inslice = numpy.round((zs-mean_z)/slice_thickness)
+			for iz in numpy.unique(inslice):
+				self.opchain.append(self.transmission_function_generator.derive(self.specimen.atoms[inslice == iz], z =mean_z + iz * slice_thickness))
+		else:
+			raise NotImplementedError
 
 		self.insert_propagators()
-		
+
 		self.prepared = True
 
 		return self
 
 	def insert_propagators(self):
+
+		if hasattr(self.transmission_function_generator, "thread"):
+			if "thread" not in self.propagator_args and "thread" in inspect.signature(self.propagator).parameters:
+				self.propagator_args["thread"] = self.transmission_function_generator.thread
+		if hasattr(self.transmission_function_generator, "mode"):
+			if "mode" not in self.propagator_args and "mode" in inspect.signature(self.propagator).parameters:
+				self.propagator_args["mode"] = self.transmission_function_generator.mode
+
 
 		self.propagator_factory = self.propagator(0,0,
 		                                          y = self.y, x = self.x, energy = self.energy,
@@ -84,16 +102,21 @@ class Multislice:
 
 	def run(self, wave=None, progress=False):
 		if wave is None:
-			wave = numpy.ones(self.y.shape+self.x.shape, dtype=numpy.complex)
-	
+			wave = AbstractArray(numpy.ones(self.y.shape+self.x.shape, dtype=numpy.complex))
+		elif not issubclass(wave.__class__, numpy.ndarray):
+			wave = AbstractArray(wave)
+
 		if not self.prepared:
 			self.prepare()
-	
+
 		if progress:
-			for op in Progress(self.opchain['operator'], self.opchain.size):
+			for op in Progress(self.opchain['operator'], self.opchain.size, keep=True):
 				wave = op.apply(wave)
 		else:
 			for op in self.opchain['operator']:
 				wave = op.apply(wave)
-			
+
+		#wave = wave.set_mode("numpy")
+		if isinstance(wave, AbstractArray):
+			wave = wave.to_ndarray()
 		return wave

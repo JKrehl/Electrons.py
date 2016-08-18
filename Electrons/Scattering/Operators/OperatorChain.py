@@ -76,10 +76,12 @@ class OperatorChain(numpy.ndarray):
 		self[...] = self[numpy.argsort(self['zi'], kind='mergesort')]
 
 	def iszcontinuous(self):
-		if self.size!=0:
-			return numpy.all(numpy.diff(numpy.vstack((self['zi'][:-1], self['zf'][1:])), axis=0)==0)
+		return len(self.get_gaps())==0
 
 	def get_gaps(self, indices=False):
+		if self.size == 0:
+			return []
+
 		zfs = self['zf'][:-1]
 		zis = self['zi'][1:]
 		if self.zf is not None:
@@ -90,8 +92,9 @@ class OperatorChain(numpy.ndarray):
 			zis = numpy.hstack((self['zi'][0], zis))
 
 		gaps = numpy.vstack((zfs, zis)).T
+		sel = numpy.diff(gaps).flatten()!=0
 		if indices:
-			return numpy.vstack((numpy.arange(gaps.shape[0]), gaps[numpy.diff(gaps).flatten()!=0,:].T)).T
+			return numpy.vstack((numpy.arange(gaps.shape[0])[sel], gaps[sel, :].T)).T
 		else:
 			return gaps[numpy.diff(gaps).flatten()!=0,:]
 

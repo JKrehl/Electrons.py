@@ -41,7 +41,7 @@ class Progress():
 		if ipy:
 			self.box = ipywidgets.HBox(width="100%", align="center")
 			self.bar = ipywidgets.IntProgress(min=0, max=self.length, margin="auto", width="auto")
-			self.label = ipywidgets.Latex(margin="auto", width="auto")
+			self.label = ipywidgets.Label(margin="auto", width="auto")
 			self.labelproto = "[{}/{}]".format("{:%dd}"%len(str(self.length)), self.length)
 			self.label.value = self.labelproto.format(self.bar.value)
 
