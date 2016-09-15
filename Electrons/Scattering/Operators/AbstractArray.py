@@ -17,7 +17,12 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import numpy
 
-import reikna.cluda.cuda
+try:
+    import reikna.cluda.cuda
+    CUDA = True
+except ImportError:
+    CUDA = False
+
 import reikna.cluda.ocl
 
 class AbstractArray:
@@ -61,45 +66,46 @@ class AbstractArray_Numpy(numpy.ndarray, AbstractArray):
 
 AbstractArray._modes['numpy'] = AbstractArray_Numpy
 
-class AbstractArray_CUDA(reikna.cluda.cuda.Array, AbstractArray):
-	mode = "cuda"
+if CUDA:
+    class AbstractArray_CUDA(reikna.cluda.cuda.Array, AbstractArray):
+    	mode = "cuda"
 
-	def __init__(self, *args, **kwargs):
-		pass
+    	def __init__(self, *args, **kwargs):
+    		pass
 
-	@staticmethod
-	def get_thread(thread=None):
-		if isinstance(thread, reikna.cluda.cuda.Thread):
-			return thread
-		elif isinstance(thread, reikna.cluda.ocl.Thread):
-			raise TypeError("Thread of wrong CLUDA Backend given")
-		else:
-			return reikna.cluda.cuda.Thread.create()
+    	@staticmethod
+    	def get_thread(thread=None):
+    		if isinstance(thread, reikna.cluda.cuda.Thread):
+    			return thread
+    		elif isinstance(thread, reikna.cluda.ocl.Thread):
+    			raise TypeError("Thread of wrong CLUDA Backend given")
+    		else:
+    			return reikna.cluda.cuda.Thread.create()
 
-	@classmethod
-	def from_ndarray(cls, array, thread = None):
-		if isinstance(thread, reikna.cluda.cuda.Thread):
-			pass
-		elif isinstance(thread, reikna.cluda.ocl.Thread):
-			raise TypeError("Thread of wrong CLUDA Backend given")
-		else:
-			thread = reikna.cluda.cuda.Thread.create()
+    	@classmethod
+    	def from_ndarray(cls, array, thread = None):
+    		if isinstance(thread, reikna.cluda.cuda.Thread):
+    			pass
+    		elif isinstance(thread, reikna.cluda.ocl.Thread):
+    			raise TypeError("Thread of wrong CLUDA Backend given")
+    		else:
+    			thread = reikna.cluda.cuda.Thread.create()
 
-		self = __class__.get_thread(thread).to_device(array)
-		self.__class__ = __class__
+    		self = __class__.get_thread(thread).to_device(array)
+    		self.__class__ = __class__
 
-		return self
+    		return self
 
-	def to_ndarray(self):
-		return self.get()
+    	def to_ndarray(self):
+    		return self.get()
 
-	def to_same_mode(self, thread=None):
-		if self.thread == thread or thread == None:
-			return self
-		else:
-			return self.from_ndarray(self.to_ndarray(), thread)
+    	def to_same_mode(self, thread=None):
+    		if self.thread == thread or thread == None:
+    			return self
+    		else:
+    			return self.from_ndarray(self.to_ndarray(), thread)
 
-AbstractArray._modes['cuda'] = AbstractArray_CUDA
+    AbstractArray._modes['cuda'] = AbstractArray_CUDA
 
 class AbstractArray_OpenCL(reikna.cluda.ocl.Array, AbstractArray):
 	mode = "opencl"
