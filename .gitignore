@@ -11,3 +11,7 @@
 *.el
 __pycache__
 .idea
+
+build
+dist
+Electrons.egg-info
