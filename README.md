@@ -49,3 +49,7 @@ The scripts are largely undocumented and might carry crippling bugs. Explanation
 - Matplotlib <http://matplotlib.org/>
 - VisPy <http://vispy.org/>
 - pyFFTW <https://hgomersall.github.io/pyFFTW/index.html> (optional)
+
+## Install
+
+As you normally would: `git checkout git@github.com:JKrehl/Electrons.py.git` and `python setup.py install` or `python setup.py develop`.
