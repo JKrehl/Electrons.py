@@ -52,4 +52,4 @@ The scripts are largely undocumented and might carry crippling bugs. Explanation
 
 ## Install
 
-As you normally would: `git checkout git@github.com:JKrehl/Electrons.py.git` and `python setup.py install` or `python setup.py develop`.
+As you normally would: `git clone git@github.com:JKrehl/Electrons.py.git` and `python setup.py install` or `python setup.py develop`.
