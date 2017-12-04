@@ -47,16 +47,32 @@ class Multislice:
 
 		self.shared = dict()
 
-	def prepare(self):
 		self.k = Physics.wavenumber(self.energy)
 
 		self.ky, self.kx = FT.reciprocal_coords(self.y, self.x)
 		self.kk = numpy.add.outer(self.ky**2, self.kx**2)
 
+	def prep_factories(self):
 		self.transmission_function_generator = self.transmission_function(self.specimen.atoms,
 		                                                                  y=self.y, x=self.x, energy=self.energy,
 		                                                                  factory=True,
 		                                                                  **self.transmission_function_args)
+
+		if hasattr(self.transmission_function_generator, "thread"):
+			if "thread" not in self.propagator_args and "thread" in inspect.signature(self.propagator).parameters:
+				self.propagator_args["thread"] = self.transmission_function_generator.thread
+		if hasattr(self.transmission_function_generator, "mode"):
+			if "mode" not in self.propagator_args and "mode" in inspect.signature(self.propagator).parameters:
+				self.propagator_args["mode"] = self.transmission_function_generator.mode
+
+
+		self.propagator_factory = self.propagator(0,0,
+		                                          y = self.y, x = self.x, energy = self.energy,
+		                                          factory=True,
+		                                          **self.propagator_args)
+
+	def prepare(self):
+		self.prep_factories()
 
 		if self.slicer == "trivial":
 			self.specimen.zsort()
@@ -80,20 +96,6 @@ class Multislice:
 		return self
 
 	def insert_propagators(self):
-
-		if hasattr(self.transmission_function_generator, "thread"):
-			if "thread" not in self.propagator_args and "thread" in inspect.signature(self.propagator).parameters:
-				self.propagator_args["thread"] = self.transmission_function_generator.thread
-		if hasattr(self.transmission_function_generator, "mode"):
-			if "mode" not in self.propagator_args and "mode" in inspect.signature(self.propagator).parameters:
-				self.propagator_args["mode"] = self.transmission_function_generator.mode
-
-
-		self.propagator_factory = self.propagator(0,0,
-		                                          y = self.y, x = self.x, energy = self.energy,
-		                                          factory=True,
-		                                          **self.propagator_args)
-
 		for i, zi, zf in self.opchain.get_gaps(indices=True)[::-1]:
 			self.opchain.insert(i, self.propagator_factory.derive(zi, zf))
 

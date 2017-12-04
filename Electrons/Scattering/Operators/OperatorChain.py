@@ -53,25 +53,7 @@ class OperatorChain(numpy.ndarray):
 	def prepend(self, operator):
 		self.insert(0, operator)
 
-	def zinsert(self, operator, z=None):
-		if z is None: z = operator.z
-
-		arg = numpy.nonzero((self['zi'] == z)&(self['zi'] < self['zf']))[0]
-		if len(arg) != 0:
-			self.insert(arg[0], operator)
-			return True
-
-		arg = tuple(numpy.nonzero((self['zi'] < z)&(self['zf'] > z)))[0]
-		if len(arg) != 0:
-			ops = self['operator'][arg[0]].split(z)
-			self[arg[0]] = (ops[1].zi, ops[1].zf, ops[1])
-			self.insert(arg[0], operator)
-			self.insert(arg[0], ops[0])
-			return True
-
-		raise NotImplementedError
-
-	def sortz(self):
+	def zsort(self):
 		self[...] = self[numpy.argsort(self['zf'], kind='mergesort')]
 		self[...] = self[numpy.argsort(self['zi'], kind='mergesort')]
 

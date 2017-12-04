@@ -1,4 +1,4 @@
-from .Operator import Operator, PlaneOperator, IntervalOperator, Slice, SliceStacker
+from .Operator import Operator, PlaneOperator, IntervalOperator, Slice
 from .OperatorChain import OperatorChain
 from .AbstractArray import AbstractArray
 

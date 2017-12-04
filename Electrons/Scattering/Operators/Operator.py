@@ -43,22 +43,12 @@ class Slice(PlaneOperator):
 
 	def apply(self, wave, out=None):
 		if isinstance(wave, AbstractArray):
-			wave = wave.set_mode("numpy")
+			arr = wave.to_ndarray()
+		else:
+			arr = wave.copy()
 
 		if self.callback is not None:
-			self.callback(self, wave)
+			self.callback(self, arr)
 		else:
-			self.slice = wave.copy()
+			self.slice = arr
 		return wave
-
-class SliceStacker():
-	def __init__(self, callback=None):
-		self.callback = callback
-		self.stack = []
-
-	def slice(self, z):
-		self.stack.append(Slice(z, self.callback))
-		return self.stack[-1]
-
-	def get(self):
-		return numpy.concatenate(tuple(i.slice.reshape(1, *i.slice.shape) for i in self.stack), axis=0)

@@ -105,7 +105,7 @@ class FlatAtomDW(PlaneOperator):
 		if isinstance(wave, AbstractArray):
 			wave = wave._as("numpy")
 
-			numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transmission_function, wave=wave), out=wave)
+		numexpr.evaluate("tf*wave", local_dict=dict(tf=self.transmission_function, wave=wave), out=wave)
 
 		if self.forgetful:
 			self.transmission_function = None
